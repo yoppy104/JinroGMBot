@@ -4,10 +4,17 @@ def hasCommandSymbol(content):
     return content[0] == COMMAND_SYMBOL
 
 
+EMOJI = {
+    "ok": '✅',
+    "ng": '❌'
+}
+
 class Command:
     def __init__(self):
         self.system_methods = {}
         self.command_list = {}
+
+        self.send_emoji = []
     
 
     # コマンドを追加する
@@ -22,6 +29,20 @@ class Command:
         for key in self.command_list.keys():
             txt += "{} : {}\n".format(key, self.command_list[key])
         return txt
+    
+
+    def getCommands(self):
+        out = {
+            "command": "",
+            "explain": "",
+            "args": ""
+        }
+        for key in self.command_list.keys():
+            temp = self.command_list[key].split(" ")
+            out["command"] += "{}\n".format(key)
+            out["explain"] += "{}\n".format(temp[0])
+            out["args"]    += "{}\n".format(temp[1])
+        return out
 
     
     # コマンドを実行する

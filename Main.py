@@ -14,6 +14,7 @@ async def PingPong(message):
 # テキストchannelの作成
 async def MKChannel(message):
     if not message.author.guild_permissions.administrator:
+        await connecter.Reply(message.author.mention, message.channel, "[Permission Error] Admin Only")
         return
     name = message.content.split(" ")[1]
     new_ch = await connecter.createChannelFromMessage(message, name)
@@ -23,19 +24,30 @@ async def MKChannel(message):
 
 # コマンドリストの送信
 async def SendCommandList(message):
-    await connecter.Reply(message.author.mention, message.channel, str(command))
+    command_txt = command.getCommands()
+    embed = discord.Embed(title="Command List", description="")
+    embed.add_field(name="コマンド名", value=command_txt["command"])
+    embed.add_field(name="説明", value=command_txt["explain"])
+    embed.add_field(name="引数", value=command_txt["args"])
+    await message.channel.send(embed=embed)
 
 # テキストchannel内のログを全て削除する。
 async def CleanUp(message):
     if not message.author.guild_permissions.administrator:
+        await connecter.Reply(message.author.mention, message.channel, "[Permission Error] Admin Only")
         return
     await connecter.CleanUp(message.channel)
 
+# 許諾ダイアログを送信する
+async def CheckOK(mention, channel):
+
+
+
 # Commandの登録
-command.addCommand("!ping", PingPong, "接続チェック 引数[なし]  備考[]")
-command.addCommand("!command", SendCommandList, "コマンドのリストを返す。引数[なし]  備考[]")
-command.addCommand("!cleanup", CleanUp, "ログを全て削除する  備考[管理者限定]")
-command.addCommand("!mkch", MKChannel, "チャンネルを作成する 　引数[チャンネル名]  備考[管理者限定]")
+command.addCommand("!ping", PingPong, "接続チェック。 なし")
+command.addCommand("!command", SendCommandList, "コマンドのリストを返す。 なし")
+command.addCommand("!cleanup", CleanUp, "ログを全て削除する。管理者限定。 なし")
+command.addCommand("!mkch", MKChannel, "チャンネルを作成する。管理者限定 チャンネル名")
 
 
 # 接続時に起動
@@ -50,6 +62,10 @@ async def on_ready():
 @connecter.client.event
 async def on_message(message):
     if message.author.bot:
+        if len(command.send_emoji) != 0:
+            for emoji in command.send_emoji:
+                message.add_reaction(emoji)
+            command.send_emoji.clear()
         return
 
     if hasCommandSymbol(message.content):
@@ -58,6 +74,12 @@ async def on_message(message):
             await connecter.Send(message.channel, "[Syntax Error] {} is not exist".format(tag))
     else:
         await connecter.Send(message.channel, "[Syntax Error] First char is '!'")
+
+
+@connecter.client.event
+async def on_raw_reaction_add(payload):
+    pass
+
 
 
 
