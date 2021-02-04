@@ -7,26 +7,38 @@ command = Command()
 
 
 # Command用メソッド
+# 送受信のチェック
 async def PingPong(message):
     await connecter.Reply(message, "pong")
 
+# テキストchannelの作成
 async def MKChannel(message):
     name = message.content.split(" ")[1]
     new_ch = await connecter.createChannelFromMessage(message, name)
     connecter.addChannelIDs(name, new_ch.id)
-    await connecter.Reply(message, "チャンネル<<{}>>を作成しました。".format(name))
+    await connecter.Reply(message.author.mention, message.channel, "チャンネル<<{}>>を作成しました。".format(name))
     await connecter.Reply(new_ch.mention, new_ch, "作成しました。")
 
+# コマンドリストの送信
+async def SendCommandList(message):
+    await connecter.Reply(message.author.mention, message.channel, str(command))
+
+# テキストchannel内のログを全て削除する。
+async def CleanUp(message):
+    await connecter.CleanUp(message.channel)
+
 # Commandの登録
-command.addCommand("!ping", PingPong)
-command.addCommand("!mkch", MKChannel)
+command.addCommand("!ping", PingPong, "接続チェック 引数[なし]")
+command.addCommand("!command", SendCommandList, "コマンドのリストを返す。引数[なし]")
+command.addCommand("!cleanup", CleanUp, "ログを全て削除する")
+command.addCommand("!mkch", MKChannel, "チャンネルを作成する 　引数[チャンネル名]")
 
 
 # 接続時に起動
 @connecter.client.event
 async def on_ready():
     print("log in")
-    general_ch = connecter.GetChannel("general")
+    general_ch = connecter.GetChannel("genera")
     await connecter.Send(general_ch, "Bot Connected.")
 
 
@@ -38,7 +50,10 @@ async def on_message(message):
 
     if hasCommandSymbol(message.content):
         tag = message.content.split(" ")[0]
-        await command.doCommand(tag, message)
+        if not await command.doCommand(tag, message):
+            await connecter.Send(message.channel, "[Syntax Error] {} is not exist".format(tag))
+    else:
+        await connecter.Send(message.channel, "[Syntax Error] First char is '!'")
 
 
 
