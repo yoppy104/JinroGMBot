@@ -1,5 +1,6 @@
 from System.Connecter import Connecter
 from System.Command import *
+from System.Assert import *
 import discord
 
 connecter = Connecter()
@@ -14,7 +15,7 @@ async def PingPong(message):
 # テキストchannelの作成
 async def MKChannel(message):
     if not message.author.guild_permissions.administrator:
-        await connecter.Reply(message.author.mention, message.channel, "[Permission Error] Admin Only")
+        await connecter.Reply(message.author.mention, message.channel, permissionError("Admin Only"))
         return
     name = message.content.split(" ")[1]
     new_ch = await connecter.createChannelFromMessage(message, name)
@@ -34,13 +35,18 @@ async def SendCommandList(message):
 # テキストchannel内のログを全て削除する。
 async def CleanUp(message):
     if not message.author.guild_permissions.administrator:
-        await connecter.Reply(message.author.mention, message.channel, "[Permission Error] Admin Only")
+        await connecter.Reply(message.author.mention, message.channel, permissionError("Admin Only"))
         return
-    await connecter.CleanUp(message.channel)
+    async def do():
+        await connecter.CleanUp(message.channel)
+    command.stack_method = do
+    await CheckOK(message.author.mention, message.channel, "全てのログを削除します。よろしいですか？")
 
 # 許諾ダイアログを送信する
-async def CheckOK(mention, channel):
-
+async def CheckOK(mention, channel, content):
+    command.send_emoji.append(EMOJI["ok"])
+    command.send_emoji.append(EMOJI["ng"])
+    await connecter.Reply(mention, channel, content)
 
 
 # Commandの登録
@@ -64,21 +70,28 @@ async def on_message(message):
     if message.author.bot:
         if len(command.send_emoji) != 0:
             for emoji in command.send_emoji:
-                message.add_reaction(emoji)
+                await message.add_reaction(emoji)
             command.send_emoji.clear()
         return
 
     if hasCommandSymbol(message.content):
         tag = message.content.split(" ")[0]
         if not await command.doCommand(tag, message):
-            await connecter.Send(message.channel, "[Syntax Error] {} is not exist".format(tag))
+            await connecter.Send(message.channel, syntaxError("{} is not exist".format(tag)))
     else:
-        await connecter.Send(message.channel, "[Syntax Error] First char is '!'")
+        await connecter.Send(message.channel, syntaxError("First char is '!'"))
 
 
 @connecter.client.event
 async def on_raw_reaction_add(payload):
-    pass
+    if payload.member.bot:
+        return
+    if payload.emoji.name == EMOJI["ok"]:
+        if command.stack_method != None:
+            await command.stack_method()
+    elif payload.emoji.name == EMOJI["ng"]:
+        await connecter.Send(connecter.GetChannel(payload.channel_id), "実行をやめます")
+        command.InitStackMethod()
 
 
 

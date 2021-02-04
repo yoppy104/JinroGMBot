@@ -26,12 +26,19 @@ class Connecter:
         self.channel_ids[channel_name] = ch_id
 
     # channelIDを取得する。
-    def GetChannel(self, channel_name):
+    def GetChannelFromName(self, channel_name):
         if not channel_name in self.channel_ids.keys():
             print("[Key Not Found] {}".format(channel_name))
             return None
         ch_id = self.channel_ids[channel_name]
+        return self.GetChannel(ch_id)
+
+    def GetChannel(self, ch_id):
         return self.client.get_channel(ch_id)
+
+    def GetUser(self, user_id):
+        return self.client.get_user(user_id)
+
 
     # 特定のチャンネルにメッセージを送信する。
     async def Send(self, channel, content):

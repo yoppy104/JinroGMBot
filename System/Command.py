@@ -3,6 +3,12 @@ COMMAND_SYMBOL = "!"
 def hasCommandSymbol(content):
     return content[0] == COMMAND_SYMBOL
 
+def stackMethodDictionary(method, *args):
+    return {
+        "method": method,
+        "args": args
+    }
+
 
 EMOJI = {
     "ok": '✅',
@@ -11,10 +17,20 @@ EMOJI = {
 
 class Command:
     def __init__(self):
+        # コマンドから実行されるメソッドの配列
         self.system_methods = {}
+        # コマンドの説明をまとめたリスト
         self.command_list = {}
-
+        
+        # 送信を待機している絵文字
         self.send_emoji = []
+
+        # 処理を待機しているメソッド
+        self.stack_method = None
+
+    # 待機メソッドを初期化する。
+    def InitStackMethod(self):
+        self.stack_method = None
     
 
     # コマンドを追加する

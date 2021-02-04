@@ -9,6 +9,3 @@ class ErrorLog:
     
     async def permissionError(self, channel, message):
         await channel.send("[Permission Error] {}".format(message))
-
-    
-    async def 
