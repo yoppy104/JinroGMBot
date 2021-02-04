@@ -9,10 +9,12 @@ command = Command()
 # Command用メソッド
 # 送受信のチェック
 async def PingPong(message):
-    await connecter.Reply(message, "pong")
+    await connecter.Reply(message.author.mention, message.channel, "pong")
 
 # テキストchannelの作成
 async def MKChannel(message):
+    if not message.author.guild_permissions.administrator:
+        return
     name = message.content.split(" ")[1]
     new_ch = await connecter.createChannelFromMessage(message, name)
     connecter.addChannelIDs(name, new_ch.id)
@@ -25,20 +27,22 @@ async def SendCommandList(message):
 
 # テキストchannel内のログを全て削除する。
 async def CleanUp(message):
+    if not message.author.guild_permissions.administrator:
+        return
     await connecter.CleanUp(message.channel)
 
 # Commandの登録
-command.addCommand("!ping", PingPong, "接続チェック 引数[なし]")
-command.addCommand("!command", SendCommandList, "コマンドのリストを返す。引数[なし]")
-command.addCommand("!cleanup", CleanUp, "ログを全て削除する")
-command.addCommand("!mkch", MKChannel, "チャンネルを作成する 　引数[チャンネル名]")
+command.addCommand("!ping", PingPong, "接続チェック 引数[なし]  備考[]")
+command.addCommand("!command", SendCommandList, "コマンドのリストを返す。引数[なし]  備考[]")
+command.addCommand("!cleanup", CleanUp, "ログを全て削除する  備考[管理者限定]")
+command.addCommand("!mkch", MKChannel, "チャンネルを作成する 　引数[チャンネル名]  備考[管理者限定]")
 
 
 # 接続時に起動
 @connecter.client.event
 async def on_ready():
     print("log in")
-    general_ch = connecter.GetChannel("genera")
+    general_ch = connecter.GetChannel("general")
     await connecter.Send(general_ch, "Bot Connected.")
 
 
