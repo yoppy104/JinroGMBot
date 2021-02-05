@@ -6,6 +6,10 @@ import discord
 connecter = Connecter()
 command = Command()
 
+# todo : サーバーの参加メンバーを取得する方法を調べる。
+# todo : Playerクラスを作成してゲームの参加者を管理する機能を追加する。
+
+
 
 # Command用メソッド
 # 送受信のチェック
@@ -45,9 +49,29 @@ async def CleanUp(message):
             await connecter.Send(channel, "!cleanupの実行をやめます")
             return True
         return False
-        
     command.addStackMethod(message.channel, do)
     await CheckOK(message.author.mention, message.channel, "全てのログを削除します。よろしいですか？")
+
+# チャンネルの閲覧権限を要求
+async def RequirePermission(message):
+    arg = message.content.split(" ")
+    if len(arg) < 2:
+        return
+    channel = connecter.GetChannelFromName(arg[1])
+    async def do(payload):
+        if not payload.member.guild_permissions.administrator:
+            return False
+        if payload.emoji.name == EMOJI["ok"]:
+            await connecter.SetPermission(channel, message.author, read=True, send=True)
+            return True
+        elif payload.emoji.name == EMOJI["ng"]:
+            await connecter.Send(message.channel, "{} {}の権限要求が拒否されました。".format(message.author.mention, channel))
+            return True
+        return False
+
+    command.addStackMethod(message.channel, do)
+    await CheckOK(message.author.mention, message.channel, "{} {}が{}の閲覧権限を要求しています。".format("admin", message.author, channel))
+
 
 # 許諾ダイアログを送信する
 async def CheckOK(mention, channel, content):
@@ -61,6 +85,7 @@ command.addCommand("!ping", PingPong, "接続チェック。 なし")
 command.addCommand("!command", SendCommandList, "コマンドのリストを返す。 なし")
 command.addCommand("!cleanup", CleanUp, "ログを全て削除する。管理者限定。 なし")
 command.addCommand("!mkch", MKChannel, "チャンネルを作成する。管理者限定 チャンネル名")
+command.addCommand("!require_permission", RequirePermission, "テキストチャンネルの閲覧権限を要求する。要管理者許諾 チャンネル名")
 
 
 # 接続時に起動
@@ -85,8 +110,6 @@ async def on_message(message):
         tag = message.content.split(" ")[0]
         if not await command.doCommand(tag, message):
             await connecter.Send(message.channel, syntaxError("{} is not exist".format(tag)))
-    else:
-        await connecter.Send(message.channel, syntaxError("First char is '!'"))
 
 
 # スタンプを受け取った時の処理

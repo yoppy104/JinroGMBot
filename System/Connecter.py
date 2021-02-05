@@ -68,3 +68,8 @@ class Connecter:
     async def CleanUp(self, channel):
         await channel.purge()
 
+
+
+    # チャンネルの閲覧、送信権限を設定
+    async def SetPermission(self, channel, target, read=False, send=False):
+        await channel.set_permissions(target, read_messages=read, send_messages=send)
