@@ -26,11 +26,23 @@ class Command:
         self.send_emoji = []
 
         # 処理を待機しているメソッド
-        self.stack_method = None
+        self.stack_method = {}
 
     # 待機メソッドを初期化する。
-    def InitStackMethod(self):
-        self.stack_method = None
+    def InitStackMethod(self, channel):
+        if channel == None:
+            print("[NULL Reference] InitStackMethod channel is null")
+            return
+        if not channel in self.stack_method.keys():
+            print("[Key Not Found] InitStackMethod channel is not in keys")
+            return
+        self.stack_method[channel] = None
+
+
+    # 待機メソッドを追加する。
+    def addStackMethod(self, channel, method):
+        self.stack_method[channel] = method
+    
     
 
     # コマンドを追加する

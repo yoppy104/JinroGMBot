@@ -37,9 +37,16 @@ async def CleanUp(message):
     if not message.author.guild_permissions.administrator:
         await connecter.Reply(message.author.mention, message.channel, permissionError("Admin Only"))
         return
-    async def do():
-        await connecter.CleanUp(message.channel)
-    command.stack_method = do
+    async def do(payload):
+        if payload.emoji.name == EMOJI["ok"]:
+            await connecter.CleanUp(message.channel)
+            return True
+        elif payload.emoji.name == EMOJI["ng"]:
+            await connecter.Send(channel, "!cleanupの実行をやめます")
+            return True
+        return False
+        
+    command.addStackMethod(message.channel, do)
     await CheckOK(message.author.mention, message.channel, "全てのログを削除します。よろしいですか？")
 
 # 許諾ダイアログを送信する
@@ -82,17 +89,21 @@ async def on_message(message):
         await connecter.Send(message.channel, syntaxError("First char is '!'"))
 
 
+# スタンプを受け取った時の処理
 @connecter.client.event
 async def on_raw_reaction_add(payload):
     if payload.member.bot:
         return
-    if payload.emoji.name == EMOJI["ok"]:
-        if command.stack_method != None:
-            await command.stack_method()
-    elif payload.emoji.name == EMOJI["ng"]:
-        await connecter.Send(connecter.GetChannel(payload.channel_id), "実行をやめます")
-        command.InitStackMethod()
 
+    channel = connecter.GetChannel(payload.channel_id)
+
+    # スタンプが押されたチャンネルに待機メソッドが登録されていないなら処理を止める
+    if (not channel in command.stack_method.keys()) or (command.stack_method[channel] == None):
+        return
+
+    # メソッドが正常に終了したら待機状態をやめる。
+    if await command.stack_method[channel](payload):
+        command.InitStackMethod(channel)
 
 
 
