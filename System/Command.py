@@ -28,8 +28,11 @@ class Command:
         # 処理を待機しているメソッド
         self.stack_method = {}
 
+        # 待機処理の実行許可ダイアログ
+        self.check_stack_dialog = {}
+
     # 待機メソッドを初期化する。
-    def InitStackMethod(self, channel):
+    async def InitStackMethod(self, channel):
         if channel == None:
             print("[NULL Reference] InitStackMethod channel is null")
             return
@@ -37,6 +40,7 @@ class Command:
             print("[Key Not Found] InitStackMethod channel is not in keys")
             return
         self.stack_method[channel] = None
+        await self.check_stack_dialog[channel].delete()
 
 
     # 待機メソッドを追加する。

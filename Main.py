@@ -43,12 +43,11 @@ async def CleanUp(message):
         return
     async def do(payload):
         if payload.emoji.name == EMOJI["ok"]:
+            await command.InitStackMethod(message.channel)
             await connecter.CleanUp(message.channel)
-            return True
         elif payload.emoji.name == EMOJI["ng"]:
-            await connecter.Send(channel, "!cleanupの実行をやめます")
-            return True
-        return False
+            await command.InitStackMethod(message.channel)
+            await connecter.Send(message.channel, "!cleanupの実行をやめます")
     command.addStackMethod(message.channel, do)
     await CheckOK(message.author.mention, message.channel, "全てのログを削除します。よろしいですか？")
 
@@ -60,24 +59,27 @@ async def RequirePermission(message):
     channel = connecter.GetChannelFromName(arg[1])
     async def do(payload):
         if not payload.member.guild_permissions.administrator:
-            return False
+            return 
         if payload.emoji.name == EMOJI["ok"]:
-            await connecter.SetPermission(channel, message.author, read=True, send=True)
-            return True
+            await connecter.SetTextChannelPermission(channel, message.author, read=True, send=True, reaction=True, read_history=True)
+            await command.InitStackMethod(message.channel)
+            await connecter.Send(message.channel, "{} <<{}>>の閲覧権限を付与しました".format(message.author.mention, channel))
+            await connecter.Send(channel, "{}が閲覧可能になりました".format(message.author.mention))
         elif payload.emoji.name == EMOJI["ng"]:
-            await connecter.Send(message.channel, "{} {}の権限要求が拒否されました。".format(message.author.mention, channel))
-            return True
-        return False
+            await command.InitStackMethod(message.channel)
+            await connecter.Send(message.channel, "{} <<{}>>の権限要求が拒否されました。".format(message.author.mention, channel))
 
     command.addStackMethod(message.channel, do)
-    await CheckOK(message.author.mention, message.channel, "{} {}が{}の閲覧権限を要求しています。".format("admin", message.author, channel))
+    await CheckOK("管理者様", message.channel, "{}が<<{}>>の閲覧権限を要求しています。".format(message.author.mention, channel))
 
 
 # 許諾ダイアログを送信する
 async def CheckOK(mention, channel, content):
     command.send_emoji.append(EMOJI["ok"])
     command.send_emoji.append(EMOJI["ng"])
-    await connecter.Reply(mention, channel, content)
+    message = await connecter.Reply(mention, channel, content)
+    command.check_stack_dialog[channel] = message
+    
 
 
 # Commandの登録
@@ -92,7 +94,7 @@ command.addCommand("!require_permission", RequirePermission, "テキストチャ
 @connecter.client.event
 async def on_ready():
     print("log in")
-    general_ch = connecter.GetChannel("general")
+    general_ch = connecter.GetChannel("一般")
     await connecter.Send(general_ch, "Bot Connected.")
 
 
@@ -125,8 +127,8 @@ async def on_raw_reaction_add(payload):
         return
 
     # メソッドが正常に終了したら待機状態をやめる。
-    if await command.stack_method[channel](payload):
-        command.InitStackMethod(channel)
+    await command.stack_method[channel](payload)
+        
 
 
 

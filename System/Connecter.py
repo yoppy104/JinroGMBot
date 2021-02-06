@@ -11,13 +11,12 @@ class Connecter:
 
         self.client = discord.Client()
 
-
     def __call__(self):
         self.client.run(self.setting["token"])
 
 
     def readJsonFile(self, path):
-        f = open(path, "r")
+        f = open(path, "r", encoding="UTF-8")
         out = json.load(f)
         f.close()
         return out
@@ -44,14 +43,14 @@ class Connecter:
     async def Send(self, channel, content):
         if channel == None:
             return
-        await channel.send(content)
+        return await channel.send(content)
 
     # メンション付きで送信する。
     async def Reply(self, mention, channel, content):
         # メンションの後に改行を入れるかどうか。30文字以上か改行があるなら改行する。
         is_reline = "\n" if (len(content) > 30 or ("\n" in content)) else " "
         reply  = "{}{}{}".format(mention, is_reline, content)
-        await self.Send(channel, reply)
+        return await self.Send(channel, reply)
 
     # messageからチャンネルの生成を行う
     async def createChannelFromMessage(self, message, channel_name):
@@ -69,7 +68,6 @@ class Connecter:
         await channel.purge()
 
 
-
     # チャンネルの閲覧、送信権限を設定
-    async def SetPermission(self, channel, target, read=False, send=False):
-        await channel.set_permissions(target, read_messages=read, send_messages=send)
+    async def SetTextChannelPermission(self, channel, target, read=False, send=False, reaction=False, read_history=False):
+        await channel.set_permissions(target, read_messages=read, send_messages=send, add_reactions=reaction, read_message_history=read_history)
