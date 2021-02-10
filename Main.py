@@ -73,8 +73,9 @@ async def RequirePermission(message):
 
 # 許諾ダイアログを送信する
 async def CheckOK(mention, channel, content):
-    command.send_emoji.append(EMOJI["ok"])
-    command.send_emoji.append(EMOJI["ng"])
+    command.send_emoji[channel] = []
+    command.send_emoji[channel].append(EMOJI["ok"])
+    command.send_emoji[channel].append(EMOJI["ng"])
     message = await connecter.Reply(mention, channel, content)
     command.check_stack_dialog[channel] = message
 
@@ -134,10 +135,10 @@ async def on_ready():
 @connecter.client.event
 async def on_message(message):
     if message.author.bot:
-        if len(command.send_emoji) != 0:
-            for emoji in command.send_emoji:
+        if (message.channel in command.send_emoji) and (len(command.send_emoji[message.channel]) != 0):
+            for emoji in command.send_emoji[message.channel]:
                 await message.add_reaction(emoji)
-            command.send_emoji.clear()
+            command.send_emoji[message.channel].clear()
         return
 
     if hasCommandSymbol(message.content):

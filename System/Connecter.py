@@ -20,14 +20,13 @@ class Connecter:
         self.client.run(self.setting["token"])
 
 
+    # JSONファイルを読み込む
     def readJsonFile(self, path):
         f = open(path, "r", encoding="UTF-8")
         out = json.load(f)
         f.close()
         return out
 
-    # def addChannelIDs(self, channel_name, ch_id):
-    #     self.channel_ids[channel_name] = ch_id
 
     # チャンネルをIDから取得する。
     def GetChannel(self, ch_id):

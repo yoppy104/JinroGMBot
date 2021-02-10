@@ -23,7 +23,7 @@ class Command:
         self.command_list = {}
         
         # 送信を待機している絵文字
-        self.send_emoji = []
+        self.send_emoji = {}
 
         # 処理を待機しているメソッド
         self.stack_method = {}
