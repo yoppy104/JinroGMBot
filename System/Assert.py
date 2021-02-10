@@ -3,11 +3,14 @@ class ErrorLog:
     def __init__(self):
         pass
 
-    async def syntaxError(self, channel, message):
-        await channel.send("[Syntax Error] {}".format(message))
+    def syntaxError(self, message):
+        return "[Syntax Error] {}".format(message)
 
     
-    async def permissionError(self, channel, message):
-        await channel.send("[Permission Error] {}".format(message))
+    def permissionError(self, message):
+        return "[Permission Error] {}".format(message)
 
+
+    def nullError(self, message):
+        return "[NullReference Error] {}".format(message)
     

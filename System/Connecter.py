@@ -4,12 +4,17 @@ import json
 class Connecter:
     def __init__(self):
         self.JSON_PATH = "Data/connecter.json"
-        self.CHANNEL_IDS_PATH = "Data/channel_ids.json"
+        # self.CHANNEL_IDS_PATH = "Data/channel_ids.json"
 
         self.setting = self.readJsonFile(self.JSON_PATH)
-        self.channel_ids = self.readJsonFile(self.CHANNEL_IDS_PATH)
+        # self.channel_ids = self.readJsonFile(self.CHANNEL_IDS_PATH)
 
         self.client = discord.Client()
+
+    # 初期化
+    def Init(self):
+        self.guild = discord.utils.get(self.client.guilds, name=self.setting["server_name"])
+
 
     def __call__(self):
         self.client.run(self.setting["token"])
@@ -21,22 +26,20 @@ class Connecter:
         f.close()
         return out
 
-    def addChannelIDs(self, channel_name, ch_id):
-        self.channel_ids[channel_name] = ch_id
+    # def addChannelIDs(self, channel_name, ch_id):
+    #     self.channel_ids[channel_name] = ch_id
 
-    # channelIDを取得する。
-    def GetChannelFromName(self, channel_name):
-        if not channel_name in self.channel_ids.keys():
-            print("[Key Not Found] {}".format(channel_name))
-            return None
-        ch_id = self.channel_ids[channel_name]
-        return self.GetChannel(ch_id)
-
+    # チャンネルをIDから取得する。
     def GetChannel(self, ch_id):
-        return self.client.get_channel(ch_id)
+        return self.guild.get_channel(ch_id)
 
-    def GetUser(self, user_id):
-        return self.client.get_user(user_id)
+    # チャンネルを名前から取得する。
+    def GetChannelFromName(self, ch_name):
+        return discord.utils.get(self.guild.channels, name=ch_name)
+
+    # ユーザーをIDから取得する。
+    def GetUser(self, channel, user_id):
+        return channel.get_user(user_id)
 
 
     # 特定のチャンネルにメッセージを送信する。
@@ -53,13 +56,13 @@ class Connecter:
         return await self.Send(channel, reply)
 
     # messageからチャンネルの生成を行う
-    async def createChannelFromMessage(self, message, channel_name):
+    async def createTextChannelFromMessage(self, message, channel_name):
         category_id = message.channel.category_id
         category = message.guild.get_channel(category_id)
-        return await self.createChannel(category, channel_name)
+        return await self.createTextChannel(category, channel_name)
 
     # カテゴリにチャンネルを作成する。
-    async def createChannel(self, category, channel_name):
+    async def createTextChannel(self, category, channel_name):
         new_channel = await category.create_text_channel(name=channel_name)
         return new_channel
     
@@ -71,3 +74,8 @@ class Connecter:
     # チャンネルの閲覧、送信権限を設定
     async def SetTextChannelPermission(self, channel, target, read=False, send=False, reaction=False, read_history=False):
         await channel.set_permissions(target, read_messages=read, send_messages=send, add_reactions=reaction, read_message_history=read_history)
+
+    
+    # チャンネルで強制ミュートを切り替える
+    async def SetMute(self, member, is_mute):
+        await member.edit(mute=is_mute)

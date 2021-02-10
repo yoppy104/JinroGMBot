@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from System.Connecter import Connecter
 from System.Command import *
 from System.Assert import *
@@ -5,11 +7,7 @@ import discord
 
 connecter = Connecter()
 command = Command()
-
-# todo : サーバーの参加メンバーを取得する方法を調べる。
-# todo : Playerクラスを作成してゲームの参加者を管理する機能を追加する。
-
-
+my_assert = ErrorLog()
 
 # Command用メソッド
 # 送受信のチェック
@@ -19,10 +17,10 @@ async def PingPong(message):
 # テキストchannelの作成
 async def MKChannel(message):
     if not message.author.guild_permissions.administrator:
-        await connecter.Reply(message.author.mention, message.channel, permissionError("Admin Only"))
+        await connecter.Reply(message.author.mention, message.channel, my_assert.permissionError("Admin Only"))
         return
     name = message.content.split(" ")[1]
-    new_ch = await connecter.createChannelFromMessage(message, name)
+    new_ch = await connecter.createTextChannelFromMessage(message, name)
     connecter.addChannelIDs(name, new_ch.id)
     await connecter.Reply(message.author.mention, message.channel, "チャンネル<<{}>>を作成しました。".format(name))
     await connecter.Reply(new_ch.mention, new_ch, "作成しました。")
@@ -39,7 +37,7 @@ async def SendCommandList(message):
 # テキストchannel内のログを全て削除する。
 async def CleanUp(message):
     if not message.author.guild_permissions.administrator:
-        await connecter.Reply(message.author.mention, message.channel, permissionError("Admin Only"))
+        await connecter.Reply(message.author.mention, message.channel, my_assert.permissionError("Admin Only"))
         return
     async def do(payload):
         if payload.emoji.name == EMOJI["ok"]:
@@ -79,13 +77,45 @@ async def CheckOK(mention, channel, content):
     command.send_emoji.append(EMOJI["ng"])
     message = await connecter.Reply(mention, channel, content)
     command.check_stack_dialog[channel] = message
-    
+
+
+# 強制ミュート
+async def SetMute(message):
+    if not message.author.guild_permissions.administrator:
+        await connecter.Reply(message.author.mention, message.channel, my_assert.permissionError("Admin Only"))
+        return
+    ch_name = message.content.split(" ")[1]
+    channel = connecter.GetChannelFromName(ch_name)
+    if channel == None:        
+        await connecter.Reply(message.author.mention, message.channel, my_assert.nullError("{}というボイスチャンネルはありません".format(ch_name)))
+        return 
+    for member in channel.members:
+        if member.bot:
+            continue
+        await connecter.SetMute(member, True)
+
+# 強制ミュート解除
+async def SetDismute(message):
+    if not message.author.guild_permissions.administrator:
+        await connecter.Reply(message.author.mention, message.channel, my_assert.permissionError("Admin Only"))
+        return
+    ch_name = message.content.split(" ")[1]
+    channel = connecter.GetChannelFromName(ch_name)
+    if channel == None:
+        await connecter.Reply(message.author.mention, message.channel, my_assert.nullError("{}というボイスチャンネルはありません".format(ch_name)))
+        return 
+    for member in channel.members:
+        if member.bot:
+            continue
+        await connecter.SetMute(member, False)
 
 
 # Commandの登録
 command.addCommand("!ping", PingPong, "接続チェック。 なし")
 command.addCommand("!command", SendCommandList, "コマンドのリストを返す。 なし")
 command.addCommand("!cleanup", CleanUp, "ログを全て削除する。管理者限定。 なし")
+command.addCommand("!mute", SetMute, "チャンネルにいる人を全員、強制ミュートする。管理者限定。 チャンネル名")
+command.addCommand("!dismute", SetDismute, "チャンネルにいる人を全員、強制ミュートを解除する。管理者限定。 チャンネル名")
 command.addCommand("!mkch", MKChannel, "チャンネルを作成する。管理者限定 チャンネル名")
 command.addCommand("!require_permission", RequirePermission, "テキストチャンネルの閲覧権限を要求する。要管理者許諾 チャンネル名")
 
@@ -93,8 +123,10 @@ command.addCommand("!require_permission", RequirePermission, "テキストチャ
 # 接続時に起動
 @connecter.client.event
 async def on_ready():
+    connecter.Init()
     print("log in")
-    general_ch = connecter.GetChannel("一般")
+    general_ch = connecter.GetChannelFromName(connecter.setting["general_ch"])
+    print(general_ch)
     await connecter.Send(general_ch, "Bot Connected.")
 
 
@@ -111,7 +143,7 @@ async def on_message(message):
     if hasCommandSymbol(message.content):
         tag = message.content.split(" ")[0]
         if not await command.doCommand(tag, message):
-            await connecter.Send(message.channel, syntaxError("{} is not exist".format(tag)))
+            await connecter.Send(message.channel, my_assert.syntaxError("{} is not exist".format(tag)))
 
 
 # スタンプを受け取った時の処理
@@ -128,8 +160,6 @@ async def on_raw_reaction_add(payload):
 
     # メソッドが正常に終了したら待機状態をやめる。
     await command.stack_method[channel](payload)
-        
-
 
 
 if __name__ == "__main__":
