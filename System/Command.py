@@ -12,7 +12,9 @@ def stackMethodDictionary(method, *args):
 
 EMOJI = {
     "ok": '✅',
-    "ng": '❌'
+    "ng": '❌',
+    "join": '🤚',
+    "finish": '🐺'
 }
 
 class Command:
@@ -41,6 +43,19 @@ class Command:
             return
         self.stack_method[channel] = None
         await self.check_stack_dialog[channel].delete()
+
+    
+    # 送信する絵文字を追加する。
+    def addSendEmoji(self, channel, emoji_list, is_name=False):
+        # 名前で送られてきたら絵文字に直す
+        if is_name:
+            for i in range(len(emoji_list)):
+                emoji_list[i] = EMOJI[emoji_list[i]]
+
+        if channel in self.send_emoji.keys():
+            self.send_emoji[channel] += emoji_list
+        else:
+            self.send_emoji[channel] = emoji_list
 
 
     # 待機メソッドを追加する。

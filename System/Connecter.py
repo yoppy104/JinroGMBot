@@ -27,7 +27,6 @@ class Connecter:
         f.close()
         return out
 
-
     # チャンネルをIDから取得する。
     def GetChannel(self, ch_id):
         return self.guild.get_channel(ch_id)
@@ -54,15 +53,25 @@ class Connecter:
         reply  = "{}{}{}".format(mention, is_reline, content)
         return await self.Send(channel, reply)
 
+    # カテゴリーをギルド内に作成する
+    async def CreateCategory(self, guild, category_name):
+        new_category = await guild.create_category(name=category_name)
+        return new_category
+
     # messageからチャンネルの生成を行う
-    async def createTextChannelFromMessage(self, message, channel_name):
+    async def CreateTextChannelFromMessage(self, message, channel_name):
         category_id = message.channel.category_id
         category = message.guild.get_channel(category_id)
-        return await self.createTextChannel(category, channel_name)
+        return await self.CreateTextChannel(category, channel_name)
 
     # カテゴリにチャンネルを作成する。
-    async def createTextChannel(self, category, channel_name):
+    async def CreateTextChannel(self, category, channel_name):
         new_channel = await category.create_text_channel(name=channel_name)
+        return new_channel
+
+    # ボイスチャンネルを作成する
+    async def CreateVoiceChannel(self, category, channel_name):
+        new_channel = await category.create_voice_channel(channel_name)
         return new_channel
     
     # テキストチャンネルのログを全消去する。

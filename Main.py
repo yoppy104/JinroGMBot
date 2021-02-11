@@ -20,7 +20,7 @@ async def MKChannel(message):
         await connecter.Reply(message.author.mention, message.channel, my_assert.permissionError("Admin Only"))
         return
     name = message.content.split(" ")[1]
-    new_ch = await connecter.createTextChannelFromMessage(message, name)
+    new_ch = await connecter.CreateTextChannelFromMessage(message, name)
     connecter.addChannelIDs(name, new_ch.id)
     await connecter.Reply(message.author.mention, message.channel, "チャンネル<<{}>>を作成しました。".format(name))
     await connecter.Reply(new_ch.mention, new_ch, "作成しました。")
@@ -73,9 +73,7 @@ async def RequirePermission(message):
 
 # 許諾ダイアログを送信する
 async def CheckOK(mention, channel, content):
-    command.send_emoji[channel] = []
-    command.send_emoji[channel].append(EMOJI["ok"])
-    command.send_emoji[channel].append(EMOJI["ng"])
+    command.addSendEmoji(channel, ["ok", "ng"], is_name=True)
     message = await connecter.Reply(mention, channel, content)
     command.check_stack_dialog[channel] = message
 
@@ -134,6 +132,7 @@ async def on_ready():
 # メッセージ受信時に実行
 @connecter.client.event
 async def on_message(message):
+    # botのメッセージにスタンプを追加する処理
     if message.author.bot:
         if (message.channel in command.send_emoji) and (len(command.send_emoji[message.channel]) != 0):
             for emoji in command.send_emoji[message.channel]:
@@ -141,6 +140,7 @@ async def on_message(message):
             command.send_emoji[message.channel].clear()
         return
 
+    # コマンドを実行する処理
     if hasCommandSymbol(message.content):
         tag = message.content.split(" ")[0]
         if not await command.doCommand(tag, message):
