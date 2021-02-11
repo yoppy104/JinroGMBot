@@ -35,6 +35,9 @@ class Connecter:
     def GetChannelFromName(self, ch_name):
         return discord.utils.get(self.guild.channels, name=ch_name)
 
+    def GetCategoryFromName(self, category_name):
+        return discord.utils.get(self.guild.categories, name=category_name)
+
     # ユーザーをIDから取得する。
     def GetUser(self, channel, user_id):
         return channel.get_user(user_id)
