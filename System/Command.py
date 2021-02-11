@@ -79,16 +79,17 @@ class Command:
     
 
     def getCommands(self):
-        out = {
-            "command": "",
-            "explain": "",
-            "args": ""
-        }
+        out = []
         for key in self.command_list.keys():
             temp = self.command_list[key].split(" ")
-            out["command"] += "{}\n".format(key)
-            out["explain"] += "{}\n".format(temp[0])
-            out["args"]    += "{}\n".format(temp[1])
+            out.append(
+                {
+                    "command": key,
+                    "explain": temp[0],
+                    "permission": temp[1],
+                    "argments": temp[2]
+                }
+            )
         return out
 
     

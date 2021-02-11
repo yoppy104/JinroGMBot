@@ -51,12 +51,16 @@ class Game:
         await self.CreateVoiceChannels(BASIC_CREATE_VOICE_CHANNELS_NAME)
 
         await self.connecter.Reply(message.author.mention, message.channel, "{}で参加者を募ります".format("掲示板"))
+
+        game_main_channel = self.channels["掲示板"]
+        join_emoji = EMOJI["join"]
+        finish_emoji = EMOJI["finish"]
         await self.connecter.Send(
-            self.channels["掲示板"],
+            game_main_channel,
             "人狼ゲームを行います。参加する場合は{}を押してください。\n\n人数が揃ったら、{}を押してください。"\
-                .format(EMOJI["join"], EMOJI["finish"])
+                .format(join_emoji, finish_emoji)
             )
-        await self.command.send_emoji
+        await self.command.addSendEmoji(game_main_channel, [join_emoji, finish_emoji])
 
 
     

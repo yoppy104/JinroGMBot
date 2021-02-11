@@ -3,10 +3,12 @@
 from System.Connecter import Connecter
 from System.Command import *
 from System.Assert import *
+from Game.Game import *
 import discord
 
 connecter = Connecter()
 command = Command()
+game = Game(connecter, command)
 my_assert = ErrorLog()
 
 # Command用メソッド
@@ -27,12 +29,17 @@ async def MKChannel(message):
 
 # コマンドリストの送信
 async def SendCommandList(message):
-    command_txt = command.getCommands()
-    embed = discord.Embed(title="Command List", description="")
-    embed.add_field(name="コマンド名", value=command_txt["command"])
-    embed.add_field(name="説明", value=command_txt["explain"])
-    embed.add_field(name="引数", value=command_txt["args"])
-    await message.channel.send(embed=embed)
+    command_list = command.getCommands()
+    num_command = len(command_list)
+    embed_list = []
+    for command_value in command_list:
+        mini_embed = discord.Embed(title=command_value["command"], description="")
+        mini_embed.add_field(name="説明", value=command_value["explain"])
+        mini_embed.add_field(name="権限", value=command_value["permission"])
+        mini_embed.add_field(name="引数", value=command_value["argments"])
+        embed_list.append(mini_embed)
+    for embed in embed_list:
+        await message.channel.send(embed=embed)
 
 # テキストchannel内のログを全て削除する。
 async def CleanUp(message):
@@ -110,13 +117,16 @@ async def SetDismute(message):
 
 
 # Commandの登録
-command.addCommand("!ping", PingPong, "接続チェック。 なし")
-command.addCommand("!command", SendCommandList, "コマンドのリストを返す。 なし")
-command.addCommand("!cleanup", CleanUp, "ログを全て削除する。管理者限定。 なし")
-command.addCommand("!mute", SetMute, "チャンネルにいる人を全員、強制ミュートする。管理者限定。 チャンネル名")
-command.addCommand("!dismute", SetDismute, "チャンネルにいる人を全員、強制ミュートを解除する。管理者限定。 チャンネル名")
-command.addCommand("!mkch", MKChannel, "チャンネルを作成する。管理者限定 チャンネル名")
-command.addCommand("!require_permission", RequirePermission, "テキストチャンネルの閲覧権限を要求する。要管理者許諾 チャンネル名")
+command.addCommand("!ping", PingPong, "接続チェック everyone なし")
+command.addCommand("!command", SendCommandList, "コマンドのリストを返す everyone なし")
+command.addCommand("!cleanup", CleanUp, "ログを全て削除する 管理者 なし")
+command.addCommand("!mute", SetMute, "チャンネルにいる人を全員、強制ミュートする 管理者 チャンネル名")
+command.addCommand("!dismute", SetDismute, "チャンネルにいる人を全員、強制ミュートを解除する 管理者 チャンネル名")
+command.addCommand("!mkch", MKChannel, "チャンネルを作成する 管理者 チャンネル名")
+command.addCommand("!require_permission", RequirePermission, "テキストチャンネルの閲覧権限を要求する 要管理者許諾 チャンネル名")
+
+# 人狼ゲーム関連のコマンド
+command.addCommand("!game_start", game.onStart, "人狼ゲームを開始する everyone なし")
 
 
 # 接続時に起動
