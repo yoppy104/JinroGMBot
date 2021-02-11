@@ -1,11 +1,11 @@
 class Player:
-    def __init__(self):
+    def __init__(self, member, _player_id):
         # ユーザー情報
-        self.user = None
-        self.meniton = None
+        self.user = member
+        self.mention = member.mention
 
         # プレイヤー番号
-        self.player_id = 0
+        self.player_id = _player_id
 
         # 役職
         self.role = None
@@ -13,5 +13,6 @@ class Player:
         # 生存フラグ
         self.is_alive = True
     
+
     def setRole(self, _role):
         self.role = _role

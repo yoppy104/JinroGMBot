@@ -30,7 +30,7 @@ class Command:
         # 処理を待機しているメソッド
         self.stack_method = {}
 
-        # 待機処理の実行許可ダイアログ
+        # 待機処理の実行ダイアログ
         self.check_stack_dialog = {}
 
     # 待機メソッドを初期化する。
@@ -59,8 +59,9 @@ class Command:
 
 
     # 待機メソッドを追加する。
-    def addStackMethod(self, channel, method):
+    def addStackMethod(self, channel, method, message=None):
         self.stack_method[channel] = method
+        self.check_stack_dialog[channel] = message
     
     
 

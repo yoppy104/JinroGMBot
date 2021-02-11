@@ -8,8 +8,9 @@ class Connecter:
 
         self.setting = self.readJsonFile(self.JSON_PATH)
         # self.channel_ids = self.readJsonFile(self.CHANNEL_IDS_PATH)
-
-        self.client = discord.Client()
+   
+        intents = discord.Intents.all()
+        self.client = discord.Client(intents=intents)
 
     # 初期化
     def Init(self):
@@ -39,8 +40,8 @@ class Connecter:
         return discord.utils.get(self.guild.categories, name=category_name)
 
     # ユーザーをIDから取得する。
-    def GetUser(self, channel, user_id):
-        return channel.get_user(user_id)
+    def GetUser(self, user_id):
+        return self.guild.get_member(user_id)
 
 
     # 特定のチャンネルにメッセージを送信する。

@@ -127,6 +127,7 @@ command.addCommand("!require_permission", RequirePermission, "テキストチャ
 
 # 人狼ゲーム関連のコマンド
 command.addCommand("!game_start", game.onStart, "人狼ゲームを開始する everyone なし")
+command.addCommand("!game_finish", game.onFinish, "現在開催中のゲームを終了する everyone なし")
 
 
 # 接続時に起動
@@ -166,6 +167,22 @@ async def on_raw_reaction_add(payload):
     channel = connecter.GetChannel(payload.channel_id)
 
     # スタンプが押されたチャンネルに待機メソッドが登録されていないなら処理を止める
+    if (not channel in command.stack_method.keys()) or (command.stack_method[channel] == None):
+        return
+
+    # メソッドが正常に終了したら待機状態をやめる。
+    await command.stack_method[channel](payload)
+
+
+# スタンプを解除した時の処理
+@connecter.client.event
+async def on_raw_reaction_remove(payload):
+    channel = connecter.GetChannel(payload.channel_id)
+    member = connecter.GetUser(payload.user_id)
+    if member.bot:
+        return
+
+    # スタンプが解除されたチャンネルに待機メソッドが登録されていないなら処理を止める
     if (not channel in command.stack_method.keys()) or (command.stack_method[channel] == None):
         return
 
