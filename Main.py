@@ -4,6 +4,7 @@ from System.Connecter import Connecter
 from System.Command import *
 from System.Assert import *
 from Game.Game import *
+from Markdown.String import *
 import discord
 
 connecter = Connecter()
@@ -40,6 +41,19 @@ async def SendCommandList(message):
         embed_list.append(mini_embed)
     for embed in embed_list:
         await message.channel.send(embed=embed)
+
+# 文字の就職をテストする。
+async def DecorateTest(message):
+    decorated = ""
+    decorated += Italic("italic") + "\n"
+    decorated += Bold("bold") + "\n"
+    decorated += UnderLine("underline") + "\n"
+    decorated += DelLine("delete") + "\n"
+    decorated += Hide("hide") + "\n"
+    decorated += Background("background") + "\n"
+    decorated += Quote("quote")
+    await connecter.Send(message.channel, decorated)
+
 
 # テキストchannel内のログを全て削除する。
 async def CleanUp(message):
@@ -119,6 +133,7 @@ async def SetDismute(message):
 # Commandの登録
 command.addCommand("!ping", PingPong, "接続チェック everyone なし")
 command.addCommand("!command", SendCommandList, "コマンドのリストを返す everyone なし")
+command.addCommand("!decorate_test", DecorateTest, "修飾文字をテストする everyone なし")
 command.addCommand("!cleanup", CleanUp, "ログを全て削除する 管理者 なし")
 command.addCommand("!mute", SetMute, "チャンネルにいる人を全員、強制ミュートする 管理者 チャンネル名")
 command.addCommand("!dismute", SetDismute, "チャンネルにいる人を全員、強制ミュートを解除する 管理者 チャンネル名")

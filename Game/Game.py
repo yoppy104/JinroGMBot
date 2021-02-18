@@ -104,9 +104,9 @@ class Game:
     
     # ゲーム開始によって呼び出される処理
     async def onStart(self, message):
-        # if self.is_game:
-        #     await self.connecter.Reply(message.author.mention, message.channel, "現在ゲームを開催中です。\n!game_finishで終了してから再度実行してください。")
-        #     return
+        if self.is_game:
+            await self.connecter.Reply(message.author.mention, message.channel, "現在ゲームを開催中です。\n!game_finishで終了してから再度実行してください。")
+            return
 
         # ゲームで使用するカテゴリの作成
         self.use_category = await self.GetCategory("人狼ゲーム")
@@ -155,4 +155,21 @@ class Game:
         self.AllReset()
 
 
+    # 朝のフェーズ
+    async def onMorning(self, message):
+        pass
 
+
+    # 議論フェーズ
+    async def onDiscussion(self, message):
+        pass
+
+
+    # 投票フェーズ
+    async def onVote(self, message):
+        pass
+
+
+    # 夜フェーズ
+    async def onNight(self, message):
+        pass
