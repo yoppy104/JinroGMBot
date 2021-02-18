@@ -13,7 +13,19 @@ GAME_MINIMUM_PLAYER_NUM = 1
 
 from System.Command import EMOJI
 from Game.Player import *
+import enum
 
+# フェーズ
+class Phase(enum.Enum):
+    NON_GAME = 0,
+    START = 1,
+    MORNING = 2,
+    DISCUSSION = 3, 
+    VOTE = 4,
+    NIGHT = 5,
+    FIRST_NIGHT = 6
+
+# ゲーム
 class Game:
     def __init__(self, _connecter, _command):
         # プレイヤー一覧(alive：生存、dead:死亡)
@@ -39,12 +51,16 @@ class Game:
         # 現在ゲームを実行中かどうか
         self.is_game = False
 
+        # フェーズタイプを設定する。
+        self.phase = Phase.NON_GAME
+
 
     # ゲーム開始時の初期化
     def GameInit(self):
         self.alive = self.players
         self.dead = []
         self.role_table = {}
+        self.phase = Phase.NON_GAME
 
 
     # 完全リセット
@@ -103,7 +119,7 @@ class Game:
 
     
     # ゲーム開始によって呼び出される処理
-    async def onStart(self, message):
+    async def onRecruitment(self, message):
         if self.is_game:
             await self.connecter.Reply(message.author.mention, message.channel, "現在ゲームを開催中です。\n!game_finishで終了してから再度実行してください。")
             return
@@ -145,6 +161,7 @@ class Game:
                     members += "{}\n".format(p.mention)
                 await self.connecter.Send(game_main_channel, "以下の{}人でゲームを行います\n{}".format(self.num_player, members))
                 self.GameInit()
+                await self.onStart(message)
         self.command.addStackMethod(game_main_channel, do, message=dialog_message)
 
 
@@ -152,24 +169,43 @@ class Game:
         if not self.is_game:
             return
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを終了しました")
-        self.AllReset()
+        self.AllReset(message)
 
+
+    async def onStart(self, message):
+        self.phase = Phase.START
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを開始します。")
+        await self.onFirstNight(message)
+
+
+    async def onFirstNight(self, message):
+        self.phase = Phase.FIRST_NIGHT
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "初夜の行動を行います。")
+        await self.onMorning(message)
 
     # 朝のフェーズ
     async def onMorning(self, message):
-        pass
+        self.phase = Phase.MORNING
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "朝のフェーズになりました。")
+        await self.onDiscussion(message)
 
 
     # 議論フェーズ
     async def onDiscussion(self, message):
-        pass
+        self.phase = Phase.DISCUSSION
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "議論のフェーズになりました。")
+        await self.onVote(message)
 
 
     # 投票フェーズ
     async def onVote(self, message):
-        pass
+        self.phase = Phase.VOTE
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "投票の時間になりました")
+        await self.onNight(message)
 
 
     # 夜フェーズ
     async def onNight(self, message):
-        pass
+        self.phase = Phase.NIGHT
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "夜のフェーズになりました。")
+        await self.onMorning(message)

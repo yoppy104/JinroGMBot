@@ -141,7 +141,7 @@ command.addCommand("!mkch", MKChannel, "チャンネルを作成する 管理者
 command.addCommand("!require_permission", RequirePermission, "テキストチャンネルの閲覧権限を要求する 要管理者許諾 チャンネル名")
 
 # 人狼ゲーム関連のコマンド
-command.addCommand("!game_start", game.onStart, "人狼ゲームを開始する everyone なし")
+command.addCommand("!game_start", game.onRecruitment, "人狼ゲームを開始する everyone なし")
 command.addCommand("!game_finish", game.onFinish, "現在開催中のゲームを終了する everyone なし")
 
 
