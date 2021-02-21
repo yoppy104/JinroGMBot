@@ -17,6 +17,7 @@ my_assert = ErrorLog()
 async def PingPong(message):
     await connecter.Reply(message.author.mention, message.channel, "pong")
 
+
 # テキストchannelの作成
 async def MKChannel(message):
     if not message.author.guild_permissions.administrator:
@@ -27,6 +28,7 @@ async def MKChannel(message):
     connecter.addChannelIDs(name, new_ch.id)
     await connecter.Reply(message.author.mention, message.channel, "チャンネル<<{}>>を作成しました。".format(name))
     await connecter.Reply(new_ch.mention, new_ch, "作成しました。")
+
 
 # コマンドリストの送信
 async def SendCommandList(message):
@@ -41,6 +43,7 @@ async def SendCommandList(message):
         embed_list.append(mini_embed)
     for embed in embed_list:
         await message.channel.send(embed=embed)
+
 
 # 文字の就職をテストする。
 async def DecorateTest(message):
@@ -151,7 +154,6 @@ async def on_ready():
     connecter.Init()
     print("log in")
     general_ch = connecter.GetChannelFromName(connecter.setting["general_ch"])
-    print(general_ch)
     await connecter.Send(general_ch, "Bot Connected.")
 
 

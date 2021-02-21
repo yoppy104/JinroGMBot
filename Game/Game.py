@@ -11,6 +11,7 @@ BASIC_CREATE_VOICE_CHANNELS_NAME = [
 GAME_MINIMUM_PLAYER_NUM = 1
 
 
+from discord.ext import tasks
 from System.Command import EMOJI
 from Game.Player import *
 import enum
@@ -37,6 +38,12 @@ class Game:
         # 現在の日数
         self.now_day = 0
 
+        # 現在の議論時間
+        self.now_pass_time = 0
+
+        # 議論の最大時間
+        self.max_discuss_time = 1
+
         # 役職表
         self.role_table = {}
 
@@ -54,6 +61,9 @@ class Game:
         # フェーズタイプを設定する。
         self.phase = Phase.NON_GAME
 
+        # 既にタイマーを起動しているかどうか
+        self.is_run_timer = False
+
 
     # ゲーム開始時の初期化
     def GameInit(self):
@@ -61,6 +71,7 @@ class Game:
         self.dead = []
         self.role_table = {}
         self.phase = Phase.NON_GAME
+        self.now_pass_time = 0
 
 
     # 完全リセット
@@ -117,6 +128,17 @@ class Game:
         self.num_player -= 1
 
 
+    @tasks.loop(minutes=1)
+    async def TimerDiscussion(self):
+        await self.connecter.Reply("@everyone", self.channels["掲示板"], "タイマー開始")
+        if self.now_pass_time > 0:
+            await self.connecter.Reply("@everyone", self.channels["掲示板"], "{}分経過しました".format(self.now_pass_time))
+
+        self.now_pass_time += 1
+
+        if self.now_pass_time > self.max_discuss_time:
+            await self.onVote()
+
     
     # ゲーム開始によって呼び出される処理
     async def onRecruitment(self, message):
@@ -161,7 +183,7 @@ class Game:
                     members += "{}\n".format(p.mention)
                 await self.connecter.Send(game_main_channel, "以下の{}人でゲームを行います\n{}".format(self.num_player, members))
                 self.GameInit()
-                await self.onStart(message)
+                await self.onStart()
         self.command.addStackMethod(game_main_channel, do, message=dialog_message)
 
 
@@ -169,43 +191,75 @@ class Game:
         if not self.is_game:
             return
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを終了しました")
-        self.AllReset(message)
+        self.AllReset()
+        self.TimerDiscussion.cancel()
+        self.is_run_timer = False
 
 
-    async def onStart(self, message):
+    async def onStart(self):
+        # todo : 役職の振り分け、通知
+        # todo : 役欠けありなら、ここで対象を設定
+        # todo : 人狼が割り当てられた人は人狼チャットの閲覧権限を付与
         self.phase = Phase.START
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを開始します。")
-        await self.onFirstNight(message)
+        await self.onFirstNight()
 
 
-    async def onFirstNight(self, message):
+    async def onFirstNight(self):
+        # todo : 全ての人の夜の行動を実行
+        # todo : 全て完了してから、朝に移行
+        # todo : 占い師の初夜占いは設定を変更する。
         self.phase = Phase.FIRST_NIGHT
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "初夜の行動を行います。")
-        await self.onMorning(message)
+        await self.onMorning()
 
     # 朝のフェーズ
-    async def onMorning(self, message):
+    async def onMorning(self):
+        # todo : 生存者のミュートを解除する。
+        # todo : 朝の能力がある役職はここで
+        # todo : 夜の死亡者を通知
+        # todo : 勝敗判定を行う
         self.phase = Phase.MORNING
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "朝のフェーズになりました。")
-        await self.onDiscussion(message)
+        await self.onDiscussion()
 
 
     # 議論フェーズ
-    async def onDiscussion(self, message):
+    async def onDiscussion(self):
         self.phase = Phase.DISCUSSION
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "議論のフェーズになりました。")
-        await self.onVote(message)
+        if self.is_run_timer:
+            self.TimerDiscussion.restart()
+        else:
+            self.is_run_timer = True
+            self.TimerDiscussion.start()
 
 
     # 投票フェーズ
-    async def onVote(self, message):
+    async def onVote(self):
+        # todo : 全員をミュート
+        # todo : 投票シンボルを各プレイヤーに送信
+        # todo : 投票が完了したら、最も多かった人を追放する
+        # todo : 最多得票数の人が複数人いたら、決選投票
+        # todo : 勝敗判定
+        # todo : 遺言があるなら、追放された人だけミュートを解除する。
+        # todo : 死亡者には霊界チャットの閲覧権限を付与
         self.phase = Phase.VOTE
+
+        # タイマー関連の変数をリセットする
+        self.TimerDiscussion.stop()
+        self.now_pass_time = 0
+
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "投票の時間になりました")
-        await self.onNight(message)
+        await self.onNight()
 
 
     # 夜フェーズ
-    async def onNight(self, message):
+    async def onNight(self):
+        # todo : 夜の能力がある人のものを使用する。
+        # todo : 他の人は、疑わしい人に関しての質問を行う
+        # todo : 全員が完了してから、実行結果を全員に通知する。
+        # todo : 死亡者には霊界チャットの閲覧権限を付与
         self.phase = Phase.NIGHT
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "夜のフェーズになりました。")
-        await self.onMorning(message)
+        await self.onMorning()
