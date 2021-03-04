@@ -139,6 +139,14 @@ class Game:
         if self.now_pass_time > self.max_discuss_time:
             await self.onVote()
 
+    async def ForceMuteAlivePlayer(self):
+        for player in self.alive:
+            await self.connecter.SetMute(player.user, True)
+        
+    async def DismuteAlivePlayer(self):
+        for player in self.alive:
+            await self.connecter.SetMute(player.user, False)
+
     
     # ゲーム開始によって呼び出される処理
     async def onRecruitment(self, message):
@@ -200,6 +208,9 @@ class Game:
         # todo : 役職の振り分け、通知
         # todo : 役欠けありなら、ここで対象を設定
         # todo : 人狼が割り当てられた人は人狼チャットの閲覧権限を付与
+        
+        await self.ForceMuteAlivePlayer()
+
         self.phase = Phase.START
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを開始します。")
         await self.onFirstNight()
@@ -215,10 +226,12 @@ class Game:
 
     # 朝のフェーズ
     async def onMorning(self):
-        # todo : 生存者のミュートを解除する。
         # todo : 朝の能力がある役職はここで
         # todo : 夜の死亡者を通知
         # todo : 勝敗判定を行う
+        for player in self.alive:
+            self.connecter.SetMute(player.user, True)
+
         self.phase = Phase.MORNING
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "朝のフェーズになりました。")
         await self.onDiscussion()
@@ -227,6 +240,8 @@ class Game:
     # 議論フェーズ
     async def onDiscussion(self):
         self.phase = Phase.DISCUSSION
+        await self.DismuteAlivePlayer()
+
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "議論のフェーズになりました。")
         if self.is_run_timer:
             self.TimerDiscussion.restart()
@@ -237,7 +252,6 @@ class Game:
 
     # 投票フェーズ
     async def onVote(self):
-        # todo : 全員をミュート
         # todo : 投票シンボルを各プレイヤーに送信
         # todo : 投票が完了したら、最も多かった人を追放する
         # todo : 最多得票数の人が複数人いたら、決選投票
@@ -245,6 +259,9 @@ class Game:
         # todo : 遺言があるなら、追放された人だけミュートを解除する。
         # todo : 死亡者には霊界チャットの閲覧権限を付与
         self.phase = Phase.VOTE
+
+        await self.ForceMuteAlivePlayer()
+
 
         # タイマー関連の変数をリセットする
         self.TimerDiscussion.stop()
