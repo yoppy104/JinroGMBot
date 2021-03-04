@@ -7,11 +7,11 @@ class GameRule:
 
         # 役職の割り当て人数
         self.assign_roles = {
-            RoleNameTag.VILLAGE:        1,
-            RoleNameTag.WAREWOLF:       0,
+            RoleNameTag.VILLAGER:       0,
+            RoleNameTag.WAREWOLF:       1,
             RoleNameTag.FORTUNE_TELLER: 0,
             RoleNameTag.MEDIUM:         0,
-            RoleNameTag.KNIGHT:         0,
+            RoleNameTag.KNIGHT:         1,
             RoleNameTag.MAD_MAN:        0
         }
 

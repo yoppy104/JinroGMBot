@@ -1,7 +1,7 @@
 import enum
 
 class RoleNameTag(enum.Enum):
-    VILLAGE         = 0,            
+    VILLAGER        = 0,            
     WAREWOLF        = 1,
     FORTUNE_TELLER  = 2,
     MEDIUM          = 3,
@@ -12,7 +12,7 @@ class RoleNameTag(enum.Enum):
 # 役職名を文字列として取得
 def GetRoleStringName(name_tag):
     strName = {
-        RoleNameTag.VILLAGE:        "村人",
+        RoleNameTag.VILLAGER:        "村人",
         RoleNameTag.WAREWOLF:       "人狼",
         RoleNameTag.FORTUNE_TELLER: "占い師",
         RoleNameTag.MEDIUM:         "霊媒師",

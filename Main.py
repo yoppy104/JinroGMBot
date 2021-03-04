@@ -12,6 +12,7 @@ command = Command()
 game = Game(connecter, command)
 my_assert = ErrorLog()
 
+
 # Command用メソッド
 # 送受信のチェック
 async def PingPong(message):

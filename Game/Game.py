@@ -115,6 +115,8 @@ class Game:
         )
         self.num_player += 1
 
+        
+
     # プレイヤーの削除
     def RemovePlayer(self, member):
         remove_player = None
@@ -178,8 +180,13 @@ class Game:
                 member = self.connecter.GetUser(payload.user_id)
                 if payload.event_type == "REACTION_ADD":
                     self.AddPlayer(member)
+                    # 専用チャンネルを作成
+                    await self.GetTextChannels([member.name])
                 else:
                     self.RemovePlayer(member)
+                    # 使用チャンネルのリストから削除
+                    if member.name in self.channels.keys():
+                        self.channels.pop(member.name)
             elif payload.emoji.name == EMOJI["finish"]:
                 await self.command.InitStackMethod(game_main_channel)
                 if self.num_player < GAME_MINIMUM_PLAYER_NUM:
@@ -195,7 +202,8 @@ class Game:
         self.command.addStackMethod(game_main_channel, do, message=dialog_message)
 
 
-    async def onFinish(self, message):
+    # ゲームの終了処理
+    async def onFinish(self):
         if not self.is_game:
             return
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを終了しました")
@@ -213,29 +221,47 @@ class Game:
                 Player("GM", 1000)
             )
         shuffled = random.shuffle(self.players)
-        for i in range(self.players):
+        for i in range(len(self.players)):
             role_tag = self.rule.AssignRole(i)
 
             # 役職が見つからないなら、エラーを出して終了
             if role_tag == None:
-                await self.connecter.Reply("@everyone", self.channels["掲示板"], "役職の総数が足りていません")
-                await self.onFinish()
+                return False
 
             self.players[i].setRole(role_tag)
+        return True
 
 
 
     async def onStart(self):
         # todo : 役職の通知
-        # todo : 人狼が割り当てられた人は人狼チャットの閲覧権限を付与
-        
+        # 強制ミュート
         await self.ForceMuteAlivePlayer()
 
         self.phase = Phase.START
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを開始します。")
 
         # 役職の割り当て
-        self.AssignRole(self.rule.is_role_lack)
+        if (not self.AssignRole(self.rule.is_role_lack)):
+            # 割り当てに失敗したらエラーを出して終了
+            await self.connecter.Reply("@everyone", self.channels["掲示板"], "役職の総数が足りていません")
+            await self.onFinish()
+        
+        # テキストチャットの閲覧権限設定。自分専用のチャンネルと掲示板以外は閲覧不可に設定する
+        for player in self.players:
+            for key in self.channels.keys():
+                if key != "掲示板" and key != "討論場" and key != player.user.name:
+                    await self.connecter.SetTextChannelPermission(self.channels[key], player.user, read=False, send=False, reaction=False, read_history=False)
+
+        # 人狼チャットを見える人を割り当てる
+        for player in self.players:
+            # 人狼チャットは見える設定の人にだけ見える状態にする。
+            if player.role.visible_warewolf_chat:
+                await self.connecter.SetTextChannelPermission(self.channels["人狼の会合"], player.user, read=True, send=True, reaction=True, read_history=True)
+
+        # 全プレイヤーの専用チャンネルに役職情報を配布
+        for player in self.players:
+            await self.connecter.Reply(player.user.mention, self.channels[player.user.name], player.role.GetExplainText())
 
         await self.onFirstNight()
 
@@ -253,8 +279,6 @@ class Game:
         # todo : 朝の能力がある役職はここで
         # todo : 夜の死亡者を通知
         # todo : 勝敗判定を行う
-        for player in self.alive:
-            self.connecter.SetMute(player.user, True)
 
         self.phase = Phase.MORNING
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "朝のフェーズになりました。")

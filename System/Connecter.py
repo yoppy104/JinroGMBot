@@ -90,4 +90,7 @@ class Connecter:
     
     # チャンネルで強制ミュートを切り替える
     async def SetMute(self, member, is_mute):
-        await member.edit(mute=is_mute)
+        try:
+            await member.edit(mute=is_mute)
+        except discord.errors.HTTPException:
+            await self.Reply(member.mention, self.GetChannelFromName("一般"), "音声チャットに接続してください")
