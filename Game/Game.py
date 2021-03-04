@@ -14,7 +14,9 @@ GAME_MINIMUM_PLAYER_NUM = 1
 from discord.ext import tasks
 from System.Command import EMOJI
 from Game.Player import *
+from Game.GameRule import *
 import enum
+import random
 
 # フェーズ
 class Phase(enum.Enum):
@@ -35,6 +37,8 @@ class Game:
         self.alive = []
         self.dead = []
 
+        self.rule = GameRule()
+
         # 現在の日数
         self.now_day = 0
 
@@ -43,9 +47,6 @@ class Game:
 
         # 議論の最大時間
         self.max_discuss_time = 1
-
-        # 役職表
-        self.role_table = {}
 
         # システム関係
         self.connecter = _connecter
@@ -69,7 +70,6 @@ class Game:
     def GameInit(self):
         self.alive = self.players
         self.dead = []
-        self.role_table = {}
         self.phase = Phase.NON_GAME
         self.now_pass_time = 0
 
@@ -204,15 +204,39 @@ class Game:
         self.is_run_timer = False
 
 
+    # 役職の割り当て
+    # @param is_lack: 役欠けありか
+    def AssignRole(self, is_lack):
+        # 役欠けありなら割り当て対象にGMを選択
+        if is_lack:
+            self.players.append(
+                Player("GM", 1000)
+            )
+        shuffled = random.shuffle(self.players)
+        for i in range(self.players):
+            role_tag = self.rule.AssignRole(i)
+
+            # 役職が見つからないなら、エラーを出して終了
+            if role_tag == None:
+                await self.connecter.Reply("@everyone", self.channels["掲示板"], "役職の総数が足りていません")
+                await self.onFinish()
+
+            self.players[i].setRole(role_tag)
+
+
+
     async def onStart(self):
-        # todo : 役職の振り分け、通知
-        # todo : 役欠けありなら、ここで対象を設定
+        # todo : 役職の通知
         # todo : 人狼が割り当てられた人は人狼チャットの閲覧権限を付与
         
         await self.ForceMuteAlivePlayer()
 
         self.phase = Phase.START
         await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを開始します。")
+
+        # 役職の割り当て
+        self.AssignRole(self.rule.is_role_lack)
+
         await self.onFirstNight()
 
 
