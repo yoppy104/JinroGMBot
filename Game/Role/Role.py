@@ -74,4 +74,20 @@ class Role:
 
     def GetExplainText(self):
         return self.explain_template.format(self.name, self.team, "役職が割り当てられていません")
+
+    
+    def onNight(self, game):
+        pass
+
+    def onFirstNight(self, game):
+        pass
+
+    def onMorning(self, game):
+        pass
+
+    def onDead(self, game):
+        pass
+
+    def onCO(self, game):
+        pass
         

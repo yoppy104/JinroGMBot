@@ -22,3 +22,20 @@ class Player:
     def setRole(self, name_tag):
         self.role_tag = name_tag
         self.role = Role.GetRoleInstance(name_tag)
+
+    
+    def onNight(self, game, is_first=False):
+        if is_first:
+            self.role.onFirstNight(game)
+        else:
+            self.role.onNight(game)
+
+    def onMorning(self, game):
+        self.role.onMorning(game)
+
+    def onDead(self, game):
+        self.role.onDead(game)
+
+    def ComingOut(self, game):
+        self.role.onCO(game)
+

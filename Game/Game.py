@@ -1,22 +1,34 @@
-BASIC_CREATE_TEXT_CHANNELS_NAME = [
-    "人狼の会合",
-    "霊界",
-    "掲示板"
-]
-
-BASIC_CREATE_VOICE_CHANNELS_NAME = [
-    "討論場"
-]
-
-GAME_MINIMUM_PLAYER_NUM = 1
-
-
 from discord.ext import tasks
 from System.Command import EMOJI
 from Game.Player import *
 from Game.GameRule import *
 import enum
 import random
+
+# チャットの名前を定義する
+MAIN_CHAT_NAME = "掲示板"           # メインのテキストチャット
+WAREWOLF_CHAT_NAME = "人狼の会合"   # 人狼用の共通チャット
+DEAD_PLAYER_CHAT_NAME = "霊界"      # 死亡者用の共通チャット
+
+VOICE_CHAT_NAME = "討論場"          # 議論で使用する音声チャット
+
+# 共通で使用するテキストチャット
+BASIC_CREATE_TEXT_CHANNELS_NAME = [
+    WAREWOLF_CHAT_NAME,
+    DEAD_PLAYER_CHAT_NAME,
+    MAIN_CHAT_NAME
+]
+
+# 共通で使用する音声チャット
+BASIC_CREATE_VOICE_CHANNELS_NAME = [
+    VOICE_CHAT_NAME
+]
+
+# ゲームを開始する最小人数
+GAME_MINIMUM_PLAYER_NUM = 1
+
+EVERYONE_MENTION = "@everyone"
+
 
 # フェーズ
 class Phase(enum.Enum):
@@ -25,8 +37,10 @@ class Phase(enum.Enum):
     MORNING = 2,
     DISCUSSION = 3, 
     VOTE = 4,
-    NIGHT = 5,
-    FIRST_NIGHT = 6
+    EXPULSION = 5,
+    EVENING = 6,
+    NIGHT = 7,
+    FIRST_NIGHT = 8
 
 # ゲーム
 class Game:
@@ -65,6 +79,15 @@ class Game:
         # 既にタイマーを起動しているかどうか
         self.is_run_timer = False
 
+        # アクションスタック
+        self.action = {}
+        self.action_count = 0
+        self.action_wait_time = 0
+        self.is_run_action_wait = False
+
+        # 投票リストの初期化
+        self.vote_count = []
+
 
     # ゲーム開始時の初期化
     def GameInit(self):
@@ -72,6 +95,10 @@ class Game:
         self.dead = []
         self.phase = Phase.NON_GAME
         self.now_pass_time = 0
+        self.action_count = 0
+        self.action_wait_time = 0
+        self.is_run_action_wait = False
+        self.vote_count = []
 
 
     # 完全リセット
@@ -81,7 +108,20 @@ class Game:
         self.num_player = 0
         self.use_category = None
         self.channels = {}
+        self.action = {}
         self.GameInit()
+
+    
+    # 生存者から一人を選ばせるメッセージを投げる。
+    async def SendSelectMessage(self, target, purpose, select_list):
+        sentence = purpose + "\n数字で選択して、メッセージで送信してください\n\n"
+        ind = 0
+        for player in select_list:
+            if player != target:
+                ind += 0
+                sentence += "[{}] : {}\n".format(ind, player.name)
+        
+        self.connecter.Send(target, sentence)
     
 
     # チャンネル名のリストからテキストチャンネルを取得する。
@@ -115,6 +155,28 @@ class Game:
         )
         self.num_player += 1
 
+    
+    # channelからプレイヤーを特定して、Actionを実行する
+    def CheckAction(self, member, number):
+        # numberがメンバーのインデックス以上ならその分増加する
+        ind = -1
+        for i, player in enumerate(self.alive):
+            if player.name == member:
+                ind = 0
+        
+        # 生存者リストに見つからないなら終了
+        if ind == -1:
+            print("CheckActionで、生存者リストに該当者が見つかりません")
+            return
+        
+        if number >= ind:
+            number += 1
+
+
+        if self.action[member] != None:
+            self.action[member](number)
+            self.action[member] = None
+            self.action_count += 1
         
 
     # プレイヤーの削除
@@ -129,17 +191,54 @@ class Game:
         self.players.remove(remove_player)
         self.num_player -= 1
 
+    
+    # プレイヤーの追放
+    def Expulsion(self, index):
+        # 対象プレイヤーを生存プレイヤーから取り出す
+        expulsion_target = self.alive.pop(index)
 
+        # 対象プレイヤーを死亡プレイヤーに追加
+        self.dead.append(expulsion_target)
+
+        # 霊界チャットの権限を付与する
+        await self.connecter.SetTextChannelPermission(self.channels[DEAD_PLAYER_CHAT_NAME], expulsion_target.user, read=False, send=False, reaction=False, read_history=False)
+
+
+    # 議論時間の管理
     @tasks.loop(minutes=1)
     async def TimerDiscussion(self):
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "タイマー開始")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "タイマー開始")
         if self.now_pass_time > 0:
-            await self.connecter.Reply("@everyone", self.channels["掲示板"], "{}分経過しました".format(self.now_pass_time))
+            await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "{}分経過しました".format(self.now_pass_time))
 
         self.now_pass_time += 1
 
         if self.now_pass_time > self.max_discuss_time:
             await self.onVote()
+
+    
+    # アクションの待機
+    @tasks.loop(seconds=1)
+    async def WaitAction(self):
+        if action_count == len(self.alive):
+            # 投票アクション
+            if self.phase == Phase.VOTE:
+                await onExpulsion()
+
+            # 初夜のアクション
+            elif self.phase == Phase.FIRST_NIGHT:
+                await onMorning()
+
+            # 夜のアクション
+            elif self.phase == Phase.NIGHT:
+                await onMorning()
+        
+        self.action_wait_time += 1
+
+        # 三分ごとにリマインドする
+        if self.action_wait_time % 3 * 60 == 0:
+            await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "行動が完了していません。\n個人用チャンネルで対象プレイヤーを数字で選択してください。")
+
 
     async def ForceMuteAlivePlayer(self):
         for player in self.alive:
@@ -163,9 +262,9 @@ class Game:
         await self.GetTextChannels(BASIC_CREATE_TEXT_CHANNELS_NAME)
         await self.GetVoiceChannels(BASIC_CREATE_VOICE_CHANNELS_NAME)
 
-        await self.connecter.Reply(message.author.mention, message.channel, "{}で参加者を募ります".format("掲示板"))
+        await self.connecter.Reply(message.author.mention, message.channel, "{}で参加者を募ります".format(MAIN_CHAT_NAME))
 
-        game_main_channel = self.channels["掲示板"]
+        game_main_channel = self.channels[MAIN_CHAT_NAME]
         join_emoji = EMOJI["join"]
         finish_emoji = EMOJI["finish"]
         self.command.addSendEmoji(game_main_channel, [join_emoji, finish_emoji])
@@ -175,6 +274,7 @@ class Game:
                 .format(join_emoji, finish_emoji)
             )
         
+        # スタンプを操作したときに実行する処理
         async def do(payload):
             if payload.emoji.name == EMOJI["join"]:
                 member = self.connecter.GetUser(payload.user_id)
@@ -186,7 +286,7 @@ class Game:
                     self.RemovePlayer(member)
                     # 使用チャンネルのリストから削除
                     if member.name in self.channels.keys():
-                        self.channels.pop(member.name)
+                        del self.channels[member.name]
             elif payload.emoji.name == EMOJI["finish"]:
                 await self.command.InitStackMethod(game_main_channel)
                 if self.num_player < GAME_MINIMUM_PLAYER_NUM:
@@ -206,7 +306,7 @@ class Game:
     async def onFinish(self):
         if not self.is_game:
             return
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを終了しました")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "ゲームを終了しました")
         self.AllReset()
         self.TimerDiscussion.cancel()
         self.is_run_timer = False
@@ -234,30 +334,29 @@ class Game:
 
 
     async def onStart(self):
-        # todo : 役職の通知
         # 強制ミュート
         await self.ForceMuteAlivePlayer()
 
         self.phase = Phase.START
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "ゲームを開始します。")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "ゲームを開始します。")
 
         # 役職の割り当て
         if (not self.AssignRole(self.rule.is_role_lack)):
             # 割り当てに失敗したらエラーを出して終了
-            await self.connecter.Reply("@everyone", self.channels["掲示板"], "役職の総数が足りていません")
+            await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "役職の総数が足りていません")
             await self.onFinish()
         
         # テキストチャットの閲覧権限設定。自分専用のチャンネルと掲示板以外は閲覧不可に設定する
         for player in self.players:
             for key in self.channels.keys():
-                if key != "掲示板" and key != "討論場" and key != player.user.name:
+                if key != MAIN_CHAT_NAME and key != VOICE_CHAT_NAME and key != player.user.name:
                     await self.connecter.SetTextChannelPermission(self.channels[key], player.user, read=False, send=False, reaction=False, read_history=False)
 
         # 人狼チャットを見える人を割り当てる
         for player in self.players:
             # 人狼チャットは見える設定の人にだけ見える状態にする。
             if player.role.visible_warewolf_chat:
-                await self.connecter.SetTextChannelPermission(self.channels["人狼の会合"], player.user, read=True, send=True, reaction=True, read_history=True)
+                await self.connecter.SetTextChannelPermission(self.channels[WAREWOLF_CHAT_NAME], player.user, read=True, send=True, reaction=True, read_history=True)
 
         # 全プレイヤーの専用チャンネルに役職情報を配布
         for player in self.players:
@@ -267,21 +366,26 @@ class Game:
 
 
     async def onFirstNight(self):
-        # todo : 全ての人の夜の行動を実行
         # todo : 全て完了してから、朝に移行
         # todo : 占い師の初夜占いは設定を変更する。
+
+        for player in self.alive:
+            player.onNight(self, is_first=True)
+
         self.phase = Phase.FIRST_NIGHT
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "初夜の行動を行います。")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "初夜の行動を行います。")
         await self.onMorning()
 
     # 朝のフェーズ
     async def onMorning(self):
-        # todo : 朝の能力がある役職はここで
         # todo : 夜の死亡者を通知
         # todo : 勝敗判定を行う
 
+        for player in self.alive:
+            player.onMorning(self)
+
         self.phase = Phase.MORNING
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "朝のフェーズになりました。")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "朝のフェーズになりました。")
         await self.onDiscussion()
 
 
@@ -290,7 +394,7 @@ class Game:
         self.phase = Phase.DISCUSSION
         await self.DismuteAlivePlayer()
 
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "議論のフェーズになりました。")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "議論のフェーズになりました。")
         if self.is_run_timer:
             self.TimerDiscussion.restart()
         else:
@@ -301,30 +405,86 @@ class Game:
     # 投票フェーズ
     async def onVote(self):
         # todo : 投票シンボルを各プレイヤーに送信
-        # todo : 投票が完了したら、最も多かった人を追放する
-        # todo : 最多得票数の人が複数人いたら、決選投票
-        # todo : 勝敗判定
-        # todo : 遺言があるなら、追放された人だけミュートを解除する。
-        # todo : 死亡者には霊界チャットの閲覧権限を付与
         self.phase = Phase.VOTE
 
+        # 全員を強制ミュートする
         await self.ForceMuteAlivePlayer()
-
 
         # タイマー関連の変数をリセットする
         self.TimerDiscussion.stop()
         self.now_pass_time = 0
 
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "投票の時間になりました")
-        await self.onNight()
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "投票の時間になりました")
+
+        # 投票アクションの定義
+        def do(number):
+            self.vote_count[number] += 1
+
+        # 投票数をカウンティングする
+        self.vote_count = [0 for i in range(len(self.alive))]
+
+        # 投票メッセージを生存プレイヤー全員に送信する
+        for player in self.alive:
+            await self.SendSelectMessage(player, "投票先を選択してください", self.alive)
+
+        # アクションを待機する処理を実行する
+        if self.is_run_action_wait:
+            self.WaitAction.restart()
+        else:
+            self.WaitAction.start()
+            self.is_run_action_wait = True
+
+
+    async def onExpulsion(self):
+        # todo : 投票が完了したら、最も多かった人を追放する
+        # todo : ランダム追放
+        # todo : 最多得票数の人が複数人いたら、決選投票
+        self.phase = Phase.EXPULSION
+
+        self.WaitAction.cancel()
+
+        # 投票数が最大のプレイヤーのリストを作成する
+        max_value = max(self.vote_count)
+        max_voted_player = []
+        for value in self.vote_count:
+            if value == max_value:
+                max_voted_player.append(value)
+
+        if len(self.vote_count) == 1:
+            # 生存プレイヤーから除外
+            self.Expulsion(self.vote_count[0])
+        else:
+            # 投票アクションを追加
+            def do(number):
+                self.vote_count[number] += 1
+            # 投票数をカウンティングする
+            self.vote_count = [0 for i in range(len(self.alive))]
+
+            # 投票メッセージを生存プレイヤー全員に送信する
+            for i, player in enumerate(self.alive):
+                await self.SendSelectMessage(player, "決選投票先を選択してください", self.alive)
+
+
+        
+
+        
+    async def onEvening(self):
+        # todo : 勝敗判定
+        # todo : 遺言があるなら、追放された人だけミュートを解除する。
+        # todo : 死亡者には霊界チャットの閲覧権限を付与
+        self.phase = Phase.EVENING
+
 
 
     # 夜フェーズ
     async def onNight(self):
-        # todo : 夜の能力がある人のものを使用する。
         # todo : 他の人は、疑わしい人に関しての質問を行う
         # todo : 全員が完了してから、実行結果を全員に通知する。
         # todo : 死亡者には霊界チャットの閲覧権限を付与
+
+        for player in self.alive:
+            player.onNight(self)
+
         self.phase = Phase.NIGHT
-        await self.connecter.Reply("@everyone", self.channels["掲示板"], "夜のフェーズになりました。")
+        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "夜のフェーズになりました。")
         await self.onMorning()
