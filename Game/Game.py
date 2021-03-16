@@ -158,6 +158,9 @@ class Game:
     
     # channelからプレイヤーを特定して、Actionを実行する
     def CheckAction(self, member, number):
+        if self.phase == Phase.DISCUSSION:
+            return
+
         # numberがメンバーのインデックス以上ならその分増加する
         ind = -1
         for i, player in enumerate(self.alive):
@@ -172,7 +175,11 @@ class Game:
         if number >= ind:
             number += 1
 
+        if number > len(self.alive):
+            await self.connecter.Send(self.channels[member], "対象プレイヤーの数字を正確に入力してください")
+            return
 
+        # アクションの実行
         if self.action[member] != None:
             self.action[member](number)
             self.action[member] = None
@@ -417,8 +424,8 @@ class Game:
         await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "投票の時間になりました")
 
         # 投票アクションの定義
-        def do(number):
-            self.vote_count[number] += 1
+        def do(index):
+            self.vote_count[index] += 1
 
         # 投票数をカウンティングする
         self.vote_count = [0 for i in range(len(self.alive))]
@@ -426,6 +433,7 @@ class Game:
         # 投票メッセージを生存プレイヤー全員に送信する
         for player in self.alive:
             await self.SendSelectMessage(player, "投票先を選択してください", self.alive)
+            self.action[player.name] = do
 
         # アクションを待機する処理を実行する
         if self.is_run_action_wait:
@@ -450,19 +458,27 @@ class Game:
             if value == max_value:
                 max_voted_player.append(value)
 
-        if len(self.vote_count) == 1:
+        if len(max_voted_player) == 1:
             # 生存プレイヤーから除外
-            self.Expulsion(self.vote_count[0])
+            self.Expulsion(max_voted_player[0])
         else:
             # 投票アクションを追加
-            def do(number):
-                self.vote_count[number] += 1
+            def do(index):
+                self.vote_count[index] += 1
+
             # 投票数をカウンティングする
             self.vote_count = [0 for i in range(len(self.alive))]
 
             # 投票メッセージを生存プレイヤー全員に送信する
             for i, player in enumerate(self.alive):
-                await self.SendSelectMessage(player, "決選投票先を選択してください", self.alive)
+                if not i in max_voted_player:
+                    await self.SendSelectMessage(player, "決選投票先を選択してください", self.alive)
+                    self.action[player.name] = do
+                else:
+                    await self.connecter.Send(player, "決選投票中です。お待ちください")
+            
+            # 投票待機を実行
+            self.WaitAction.restart()
 
 
         

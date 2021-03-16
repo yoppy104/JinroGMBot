@@ -174,6 +174,8 @@ async def on_message(message):
         tag = message.content.split(" ")[0]
         if not await command.doCommand(tag, message):
             await connecter.Send(message.channel, my_assert.syntaxError("{} is not exist".format(tag)))
+    elif str.isdecimal(message.content):
+        game.CheckAction(message.member.name, int(message.content))
 
 
 # スタンプを受け取った時の処理
