@@ -49,6 +49,8 @@ class Game:
         self.players = []
         self.num_player = 0
         self.alive = []
+        self.expulsed = []
+        self.killed = []
         self.dead = []
 
         self.rule = GameRule()
@@ -91,11 +93,16 @@ class Game:
         # 決選投票の投票先になっているプレイヤー
         self.final_voted_player = None
 
+        # 人狼の残り人数
+        self.num_of_warewolf = self.rule.assign_roles[RoleNameTag.WAREWOLF]
+
 
     # ゲーム開始時の初期化
     def GameInit(self):
         self.alive = self.players
         self.dead = []
+        self.expulsed = []
+        self.killed = []
         self.phase = Phase.NON_GAME
         self.now_pass_time = 0
         self.action_count = 0
@@ -103,6 +110,7 @@ class Game:
         self.is_run_action_wait = False
         self.vote_count = []
         self.final_voted_player = None
+        self.num_of_warewolf = self.rule.assign_roles[RoleNameTag.WAREWOLF]
 
 
     # 完全リセット
@@ -220,8 +228,13 @@ class Game:
         else:
             expulsion_target = self.alive.pop(index)
 
+        # 人狼なら記録されている数を減らす
+        if expulsion_target.role.name_tag == RoleNameTag.WAREWOLF:
+            self.num_of_warewolf -= 1
+
         # 対象プレイヤーを死亡プレイヤーに追加
         self.dead.append(expulsion_target)
+        self.expulsed.append(expulsion_target)
 
         # 霊界チャットの権限を付与する
         await self.connecter.SetTextChannelPermission(self.channels[DEAD_PLAYER_CHAT_NAME], expulsion_target.user, read=False, send=False, reaction=False, read_history=False)
@@ -250,16 +263,21 @@ class Game:
             num_action_user = len(self.alive) - len(self.final_voted_player)
 
         if self.action_count == num_action_user:
+            print("do action")
+            print(self.phase)
             # 投票アクション
             if self.phase == Phase.VOTE:
+                self.action_count = 0
                 await self.onExpulsion()
 
             # 初夜のアクション
             elif self.phase == Phase.FIRST_NIGHT:
+                self.action_count = 0
                 await self.onMorning()
 
             # 夜のアクション
             elif self.phase == Phase.NIGHT:
+                self.action_count = 0
                 await self.onMorning()
         
         self.action_wait_time += 1
@@ -476,8 +494,6 @@ class Game:
 
         self.WaitAction.stop()
 
-        print(self.vote_count)
-
         # 投票数が最大のプレイヤーのリストを作成する
         max_value = max(self.vote_count)
         max_voted_player = []
@@ -488,21 +504,16 @@ class Game:
         # 決選投票でも決まらなかったら、ランダムに一人を選択する
         if self.final_voted_player != None and len(max_voted_player) > 1:
             temp = random.choice(max_voted_player)
-            max_voted_player = temp
+            max_voted_player = [temp]
 
         if len(max_voted_player) == 1:
             # 生存プレイヤーから除外
             await self.Expulsion(max_voted_player[0])
             self.final_voted_player = None
-        else:
-            # 決選投票後に同数であったならランダムに追放する
-            if self.final_voted_player != None:
-                self.connecter.Send(self.channels[MAIN_CHAT_NAME], "決選投票で最高得票のプレイヤーが複数人いました。\nランダムに追放します。")
-                expulsion_index = random.choice(max_voted_player)
-                self.Expulsion(expulsion_index)
 
-                await self.onEvening()
-                return
+            await self.onEvening()
+        else:
+            self.phase = Phase.VOTE
 
             # 投票アクションを追加
             def do(index):
@@ -525,20 +536,42 @@ class Game:
             
             # 投票待機を実行
             self.action_wait_time = 0
+
+            self.WaitAction.cancel()
             self.WaitAction.restart()
         
-        await self.onEvening()
 
-
+    # 終了判定
+    async def CheckGameFinish(self):
+        # 人狼が0人になった。
+        if self.num_of_warewolf == 0:
+            await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "この村から人狼がいなくなりました。村人陣営の勝利です。")
+            return True
+        
+        # 村人の人数が人狼よりも少なくなった。
+        elif self.num_of_warewolf >= (len(self.alive) - self.num_of_warewolf):
+            await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "村人の人数が人狼以下になりました。人狼陣営の勝利です。")
+            return True
+        
+        return False
         
 
         
     async def onEvening(self):
-        # todo : 勝敗判定
         # todo : 遺言があるなら、追放された人だけミュートを解除する。
-        # todo : 死亡者には霊界チャットの閲覧権限を付与
         self.phase = Phase.EVENING
 
+        # 投票によって追放された人の通知
+        await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "{}さんが処刑されました".format(self.expulsed[-1].name))
+
+        # 終了判定
+        check_result = await self.CheckGameFinish()
+
+        if (check_result):
+            await self.onFinish()
+            return
+
+        await self.onNight()
 
 
     # 夜フェーズ
