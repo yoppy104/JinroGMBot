@@ -219,7 +219,7 @@ class Game:
         self.num_player -= 1
 
     
-    # プレイヤーの追放
+    # 昼に除外されるプレイヤー
     async def Expulsion(self, index):
         # 対象プレイヤーを生存プレイヤーから取り出す
         print("expulsion {} player".format(index))
@@ -236,8 +236,23 @@ class Game:
         self.dead.append(expulsion_target)
         self.expulsed.append(expulsion_target)
 
-        # 霊界チャットの権限を付与する
-        await self.connecter.SetTextChannelPermission(self.channels[DEAD_PLAYER_CHAT_NAME], expulsion_target.user, read=False, send=False, reaction=False, read_history=False)
+    
+    # 夜に除外されるプレイヤー
+    async def Kill(self, index):
+        # 対象プレイヤーを生存プレイヤーから取り出す
+        print("kill {} player".format(index))
+        if self.final_voted_player != None:
+            expulsion_target = self.alive.pop(self.final_voted_player[index])
+        else:
+            expulsion_target = self.alive.pop(index)
+
+        # 人狼なら記録されている数を減らす
+        if expulsion_target.role.name_tag == RoleNameTag.WAREWOLF:
+            self.num_of_warewolf -= 1
+
+        # 対象プレイヤーを死亡プレイヤーに追加
+        self.dead.append(expulsion_target)
+        self.killed.append(expulsion_target)
 
 
     # 議論時間の管理
@@ -429,14 +444,25 @@ class Game:
 
     # 朝のフェーズ
     async def onMorning(self):
-        # todo : 夜の死亡者を通知
-        # todo : 勝敗判定を行う
+        self.phase = Phase.MORNING
+
+        # 夜に死亡したプレイヤーの通知
+        for player in self.killed:
+            await self.connecter.SetTextChannelPermission(self.channels[DEAD_PLAYER_CHAT_NAME], player.user, read=False, send=False, reaction=False, read_history=False)
+            await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "{}さんが追放されました".format(player.name))
+
+        # 終了判定
+        result_check = await self.CheckGameFinish()
+        if result_check:
+            self.onFinish()
+            return
 
         for player in self.alive:
             player.onMorning(self)
 
-        self.phase = Phase.MORNING
-        await self.connecter.Reply(EVERYONE_MENTION, self.channels[MAIN_CHAT_NAME], "朝のフェーズになりました。")
+
+        
+
         await self.onDiscussion()
 
 
@@ -561,8 +587,11 @@ class Game:
         # todo : 遺言があるなら、追放された人だけミュートを解除する。
         self.phase = Phase.EVENING
 
-        # 投票によって追放された人の通知
-        await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "{}さんが処刑されました".format(self.expulsed[-1].name))
+        # 投票によって追放された人の通知と霊界チャットの割り当て
+        for player in self.expulsed:
+            await self.connecter.SetTextChannelPermission(self.channels[DEAD_PLAYER_CHAT_NAME], player.user, read=False, send=False, reaction=False, read_history=False)
+            await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "{}さんが処刑されました".format(player.name))
+        self.expulsed.clear()
 
         # 終了判定
         check_result = await self.CheckGameFinish()
@@ -578,7 +607,6 @@ class Game:
     async def onNight(self):
         # todo : 他の人は、疑わしい人に関しての質問を行う
         # todo : 全員が完了してから、実行結果を全員に通知する。
-        # todo : 死亡者には霊界チャットの閲覧権限を付与
 
         for player in self.alive:
             player.onNight(self)
