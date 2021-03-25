@@ -60,7 +60,7 @@ class Game:
         self.now_pass_time = 0
 
         # 議論の最大時間
-        self.max_discuss_time = 1
+        self.max_discuss_time = 0
 
         # システム関係
         self.connecter = _connecter
@@ -88,6 +88,9 @@ class Game:
         # 投票リストの初期化
         self.vote_count = []
 
+        # 決選投票の投票先になっているプレイヤー
+        self.final_voted_player = None
+
 
     # ゲーム開始時の初期化
     def GameInit(self):
@@ -99,6 +102,7 @@ class Game:
         self.action_wait_time = 0
         self.is_run_action_wait = False
         self.vote_count = []
+        self.final_voted_player = None
 
 
     # 完全リセット
@@ -121,7 +125,7 @@ class Game:
                 ind += 0
                 sentence += "[{}] : {}\n".format(ind, player.name)
         
-        self.connecter.Send(target, sentence)
+        await self.connecter.Send(self.GetPlayerChannel(target), sentence)
     
 
     # チャンネル名のリストからテキストチャンネルを取得する。
@@ -156,26 +160,34 @@ class Game:
         self.num_player += 1
 
     
+    # プレイヤーから、チャンネルを検索する
+    def GetPlayerChannel(self, player):
+        return self.channels[player.name]
+
+    
     # channelからプレイヤーを特定して、Actionを実行する
-    def CheckAction(self, member, number):
+    async def CheckAction(self, member, number):
         if self.phase == Phase.DISCUSSION:
             return
 
-        # numberがメンバーのインデックス以上ならその分増加する
-        ind = -1
-        for i, player in enumerate(self.alive):
-            if player.name == member:
-                ind = 0
-        
-        # 生存者リストに見つからないなら終了
-        if ind == -1:
-            print("CheckActionで、生存者リストに該当者が見つかりません")
-            return
-        
-        if number >= ind:
-            number += 1
+        # 決選投票以外では、リストから投票者が除外されているため、それを考慮したインデックスに変換する必要がある
+        # 決選投票は、投票対象プレイヤーが投票できないため、考慮する必要がない
+        if self.final_voted_player == None:
+            # numberがメンバーのインデックス以上ならその分増加する
+            ind = -1
+            for i, player in enumerate(self.alive):
+                if player.name == member:
+                    ind = i
+            
+            # 生存者リストに見つからないなら終了
+            if ind == -1:
+                print("CheckActionで、生存者リストに該当者が見つかりません")
+                return
+            
+            if number >= ind:
+                number += 1
 
-        if number > len(self.alive):
+        if number > len(self.alive) or number < 0:
             await self.connecter.Send(self.channels[member], "対象プレイヤーの数字を正確に入力してください")
             return
 
@@ -200,9 +212,13 @@ class Game:
 
     
     # プレイヤーの追放
-    def Expulsion(self, index):
+    async def Expulsion(self, index):
         # 対象プレイヤーを生存プレイヤーから取り出す
-        expulsion_target = self.alive.pop(index)
+        print("expulsion {} player".format(index))
+        if self.final_voted_player != None:
+            expulsion_target = self.alive.pop(self.final_voted_player[index])
+        else:
+            expulsion_target = self.alive.pop(index)
 
         # 対象プレイヤーを死亡プレイヤーに追加
         self.dead.append(expulsion_target)
@@ -227,23 +243,29 @@ class Game:
     # アクションの待機
     @tasks.loop(seconds=1)
     async def WaitAction(self):
-        if action_count == len(self.alive):
+
+        if self.final_voted_player == None:
+            num_action_user = len(self.alive)
+        else:
+            num_action_user = len(self.alive) - len(self.final_voted_player)
+
+        if self.action_count == num_action_user:
             # 投票アクション
             if self.phase == Phase.VOTE:
-                await onExpulsion()
+                await self.onExpulsion()
 
             # 初夜のアクション
             elif self.phase == Phase.FIRST_NIGHT:
-                await onMorning()
+                await self.onMorning()
 
             # 夜のアクション
             elif self.phase == Phase.NIGHT:
-                await onMorning()
+                await self.onMorning()
         
         self.action_wait_time += 1
 
         # 三分ごとにリマインドする
-        if self.action_wait_time % 3 * 60 == 0:
+        if self.action_wait_time % (3 * 60) == 0:
             await self.connecter.Send(self.channels[MAIN_CHAT_NAME], "行動が完了していません。\n個人用チャンネルで対象プレイヤーを数字で選択してください。")
 
 
@@ -318,6 +340,10 @@ class Game:
         self.TimerDiscussion.cancel()
         self.is_run_timer = False
 
+    
+    async def Finish(self, message):
+        await self.onFinish()
+
 
     # 役職の割り当て
     # @param is_lack: 役欠けありか
@@ -356,7 +382,7 @@ class Game:
         # テキストチャットの閲覧権限設定。自分専用のチャンネルと掲示板以外は閲覧不可に設定する
         for player in self.players:
             for key in self.channels.keys():
-                if key != MAIN_CHAT_NAME and key != VOICE_CHAT_NAME and key != player.user.name:
+                if key != MAIN_CHAT_NAME and key != VOICE_CHAT_NAME and key != player.name:
                     await self.connecter.SetTextChannelPermission(self.channels[key], player.user, read=False, send=False, reaction=False, read_history=False)
 
         # 人狼チャットを見える人を割り当てる
@@ -367,7 +393,7 @@ class Game:
 
         # 全プレイヤーの専用チャンネルに役職情報を配布
         for player in self.players:
-            await self.connecter.Reply(player.user.mention, self.channels[player.user.name], player.role.GetExplainText())
+            await self.connecter.Reply(player.mention, self.GetPlayerChannel(player), player.role.GetExplainText())
 
         await self.onFirstNight()
 
@@ -437,8 +463,10 @@ class Game:
 
         # アクションを待機する処理を実行する
         if self.is_run_action_wait:
+            self.action_wait_time = 0
             self.WaitAction.restart()
         else:
+            self.action_wait_time = 0
             self.WaitAction.start()
             self.is_run_action_wait = True
 
@@ -449,35 +477,62 @@ class Game:
         # todo : 最多得票数の人が複数人いたら、決選投票
         self.phase = Phase.EXPULSION
 
-        self.WaitAction.cancel()
+        self.WaitAction.stop()
+
+        print(self.vote_count)
 
         # 投票数が最大のプレイヤーのリストを作成する
         max_value = max(self.vote_count)
         max_voted_player = []
-        for value in self.vote_count:
+        for i, value in enumerate(self.vote_count):
             if value == max_value:
-                max_voted_player.append(value)
+                max_voted_player.append(i)
+
+        # 決選投票でも決まらなかったら、ランダムに一人を選択する
+        if self.final_voted_player != None and len(max_voted_player) > 1:
+            temp = random.choice(max_voted_player)
+            max_voted_player = temp
+
+        print(max_voted_player)
 
         if len(max_voted_player) == 1:
             # 生存プレイヤーから除外
-            self.Expulsion(max_voted_player[0])
+            print("expulsion")
+            await self.Expulsion(max_voted_player[0])
+            self.final_voted_player = None
         else:
             # 投票アクションを追加
             def do(index):
                 self.vote_count[index] += 1
 
-            # 投票数をカウンティングする
-            self.vote_count = [0 for i in range(len(self.alive))]
+            self.final_voted_player = max_voted_player
 
-            # 投票メッセージを生存プレイヤー全員に送信する
-            for i, player in enumerate(self.alive):
+            # 投票数をカウンティングする
+            self.vote_count = [0 for i in range(len(max_voted_player))]
+
+            print(self.alive)
+
+            i = 0
+            # 決選投票メッセージを生存プレイヤー全員に送信する
+            for player in self.alive:
+                print(player.name)
                 if not i in max_voted_player:
-                    await self.SendSelectMessage(player, "決選投票先を選択してください", self.alive)
+                    print("投票要求" + player.name)
+                    print(self.alive)
+                    await self.SendSelectMessage(player, "決選投票先を選択してください", [self.alive[ind] for ind in max_voted_player])
                     self.action[player.name] = do
                 else:
-                    await self.connecter.Send(player, "決選投票中です。お待ちください")
+                    print("投票対象" + str(self.GetPlayerChannel(player)))
+                    print(self.alive)
+                    await self.connecter.Send(self.GetPlayerChannel(player), "決選投票中です。お待ちください")
+                    print("test")
+                i += 1
+                print(self.alive)
+
+            print("after loop")
             
             # 投票待機を実行
+            self.action_wait_time = 0
             self.WaitAction.restart()
 
 

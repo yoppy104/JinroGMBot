@@ -6,6 +6,10 @@ class Player:
         self.user = member
         if self.user != "GM":
             self.mention = member.mention
+            self.name = member.name
+        else:
+            self.mention = "@GM"
+            self.name = "GM"
 
         # プレイヤー番号
         self.player_id = _player_id

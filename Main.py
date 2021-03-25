@@ -146,7 +146,7 @@ command.addCommand("!require_permission", RequirePermission, "テキストチャ
 
 # 人狼ゲーム関連のコマンド
 command.addCommand("!game_start", game.onRecruitment, "人狼ゲームを開始する everyone なし")
-command.addCommand("!game_finish", game.onFinish, "現在開催中のゲームを終了する everyone なし")
+command.addCommand("!game_finish", game.Finish, "現在開催中のゲームを終了する everyone なし")
 
 
 # 接続時に起動
@@ -174,8 +174,11 @@ async def on_message(message):
         tag = message.content.split(" ")[0]
         if not await command.doCommand(tag, message):
             await connecter.Send(message.channel, my_assert.syntaxError("{} is not exist".format(tag)))
+
+    # 数字が入力された場合、個人チャットでのアクションを疑う
     elif str.isdecimal(message.content):
-        game.CheckAction(message.member.name, int(message.content))
+        if message.channel.name == message.author.name:
+            await game.CheckAction(message.author.name, int(message.content))
 
 
 # スタンプを受け取った時の処理
