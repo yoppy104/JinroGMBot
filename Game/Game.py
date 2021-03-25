@@ -472,9 +472,6 @@ class Game:
 
 
     async def onExpulsion(self):
-        # todo : 投票が完了したら、最も多かった人を追放する
-        # todo : ランダム追放
-        # todo : 最多得票数の人が複数人いたら、決選投票
         self.phase = Phase.EXPULSION
 
         self.WaitAction.stop()
@@ -493,14 +490,20 @@ class Game:
             temp = random.choice(max_voted_player)
             max_voted_player = temp
 
-        print(max_voted_player)
-
         if len(max_voted_player) == 1:
             # 生存プレイヤーから除外
-            print("expulsion")
             await self.Expulsion(max_voted_player[0])
             self.final_voted_player = None
         else:
+            # 決選投票後に同数であったならランダムに追放する
+            if self.final_voted_player != None:
+                self.connecter.Send(self.channels[MAIN_CHAT_NAME], "決選投票で最高得票のプレイヤーが複数人いました。\nランダムに追放します。")
+                expulsion_index = random.choice(max_voted_player)
+                self.Expulsion(expulsion_index)
+
+                await self.onEvening()
+                return
+
             # 投票アクションを追加
             def do(index):
                 self.vote_count[index] += 1
@@ -510,30 +513,21 @@ class Game:
             # 投票数をカウンティングする
             self.vote_count = [0 for i in range(len(max_voted_player))]
 
-            print(self.alive)
-
             i = 0
             # 決選投票メッセージを生存プレイヤー全員に送信する
             for player in self.alive:
-                print(player.name)
                 if not i in max_voted_player:
-                    print("投票要求" + player.name)
-                    print(self.alive)
                     await self.SendSelectMessage(player, "決選投票先を選択してください", [self.alive[ind] for ind in max_voted_player])
                     self.action[player.name] = do
                 else:
-                    print("投票対象" + str(self.GetPlayerChannel(player)))
-                    print(self.alive)
                     await self.connecter.Send(self.GetPlayerChannel(player), "決選投票中です。お待ちください")
-                    print("test")
                 i += 1
-                print(self.alive)
-
-            print("after loop")
             
             # 投票待機を実行
             self.action_wait_time = 0
             self.WaitAction.restart()
+        
+        await self.onEvening()
 
 
         
